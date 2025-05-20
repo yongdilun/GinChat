@@ -14,17 +14,17 @@ import (
 
 // MessageService handles business logic related to messages
 type MessageService struct {
-	MongoDB  *mongo.Database
-	MsgColl  *mongo.Collection
-	ChatSvc  *ChatroomService
+	MongoDB *mongo.Database
+	MsgColl *mongo.Collection
+	ChatSvc *ChatroomService
 }
 
 // NewMessageService creates a new MessageService
 func NewMessageService(mongodb *mongo.Database, chatroomService *ChatroomService) *MessageService {
 	return &MessageService{
-		MongoDB:  mongodb,
-		MsgColl:  mongodb.Collection("messages"),
-		ChatSvc:  chatroomService,
+		MongoDB: mongodb,
+		MsgColl: mongodb.Collection("messages"),
+		ChatSvc: chatroomService,
 	}
 }
 
@@ -39,6 +39,27 @@ func (s *MessageService) SendMessage(chatroomID primitive.ObjectID, userID uint,
 	// Check if user is a member of the chatroom
 	if !s.ChatSvc.IsMember(chatroom, userID) {
 		return nil, errors.New("user is not a member of this chatroom")
+	}
+
+	// Validate message type and required fields
+	switch messageType {
+	case "text":
+		if textContent == "" {
+			return nil, errors.New("text content is required for text messages")
+		}
+	case "picture", "audio", "video":
+		if mediaURL == "" {
+			return nil, errors.New("media URL is required for media messages")
+		}
+	case "text_and_picture", "text_and_audio", "text_and_video":
+		if textContent == "" {
+			return nil, errors.New("text content is required for combined messages")
+		}
+		if mediaURL == "" {
+			return nil, errors.New("media URL is required for combined messages")
+		}
+	default:
+		return nil, errors.New("invalid message type")
 	}
 
 	// Create new message

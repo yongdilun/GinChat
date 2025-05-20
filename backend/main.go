@@ -38,6 +38,10 @@ import (
 // @BasePath /api
 // @schemes http https
 
+// @securityDefinitions.apikey ApiKeyAuth
+// @in header
+// @name Authorization
+
 var (
 	mysqlDB *gorm.DB
 	mongoDB *mongo.Database

@@ -25,10 +25,23 @@ func NewChatroomController(db *gorm.DB, mongodb *mongo.Database) *ChatroomContro
 
 // CreateChatroomRequest represents the request body for creating a chatroom
 type CreateChatroomRequest struct {
-	Name string `json:"name" binding:"required,min=3,max=100"`
+	Name string `json:"name" binding:"required,min=3,max=100" example:"General Chat"` // The name of the chatroom
 }
 
 // CreateChatroom handles chatroom creation
+// @Summary Create a new chatroom
+// @Description Create a new chatroom with the authenticated user as the creator and first member
+// @Tags chatrooms
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Param chatroom body CreateChatroomRequest true "Chatroom information"
+// @Success 201 {object} map[string]models.ChatroomResponse "Chatroom created successfully"
+// @Failure 400 {object} map[string]string "Invalid request body"
+// @Failure 401 {object} map[string]string "User not authenticated"
+// @Failure 409 {object} map[string]string "Chatroom with this name already exists"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /chatrooms [post]
 func (cc *ChatroomController) CreateChatroom(c *gin.Context) {
 	var req CreateChatroomRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -62,6 +75,16 @@ func (cc *ChatroomController) CreateChatroom(c *gin.Context) {
 }
 
 // GetChatrooms handles getting all chatrooms
+// @Summary Get all chatrooms
+// @Description Retrieve a list of all available chatrooms
+// @Tags chatrooms
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Success 200 {object} map[string][]models.ChatroomResponse "List of chatrooms"
+// @Failure 401 {object} map[string]string "User not authenticated"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /chatrooms [get]
 func (cc *ChatroomController) GetChatrooms(c *gin.Context) {
 	// Get user ID from context (set by auth middleware)
 	_, exists := c.Get("user_id")
@@ -89,6 +112,20 @@ func (cc *ChatroomController) GetChatrooms(c *gin.Context) {
 }
 
 // JoinChatroom handles joining a chatroom
+// @Summary Join a chatroom
+// @Description Add the authenticated user as a member of the specified chatroom
+// @Tags chatrooms
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Param id path string true "Chatroom ID" example:"60d5f8b8e6b5f0b3e8b4b5b3"
+// @Success 200 {object} map[string]string "Joined chatroom successfully"
+// @Failure 400 {object} map[string]string "Invalid chatroom ID"
+// @Failure 401 {object} map[string]string "User not authenticated"
+// @Failure 404 {object} map[string]string "Chatroom not found"
+// @Failure 409 {object} map[string]string "User is already a member of this chatroom"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /chatrooms/{id}/join [post]
 func (cc *ChatroomController) JoinChatroom(c *gin.Context) {
 	// Get chatroom ID from URL
 	chatroomID, err := primitive.ObjectIDFromHex(c.Param("id"))

@@ -7,28 +7,45 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ginchat/utils"
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
 )
 
 // WebSocketController handles WebSocket connections
 type WebSocketController struct {
-	clients    map[uint]map[*websocket.Conn]bool
-	clientsMux sync.RWMutex
-	broadcast  chan []byte
-	logger     *logrus.Logger
+	clients              map[uint]map[*websocket.Conn]bool
+	rooms                map[string]map[*websocket.Conn]bool
+	clientsMux           sync.RWMutex
+	broadcast            chan []byte
+	logger               *logrus.Logger
+	processedMessages    map[string]map[string]bool
+	connectionAttempts   map[uint]time.Time
+	connectionAttemptsMux sync.RWMutex
 }
+
+// Global WebSocket controller instance for broadcasting messages
+var GlobalWebSocketController *WebSocketController
 
 // NewWebSocketController creates a new WebSocketController
 func NewWebSocketController(logger *logrus.Logger) *WebSocketController {
 	controller := &WebSocketController{
-		clients:   make(map[uint]map[*websocket.Conn]bool),
-		broadcast: make(chan []byte),
-		logger:    logger,
+		clients:            make(map[uint]map[*websocket.Conn]bool),
+		rooms:              make(map[string]map[*websocket.Conn]bool),
+		broadcast:          make(chan []byte),
+		logger:             logger,
+		processedMessages:  make(map[string]map[string]bool),
+		connectionAttempts: make(map[uint]time.Time),
 	}
 
 	// Start broadcast handler
 	go controller.handleBroadcasts()
+
+	// Start a goroutine to periodically clean up old connection attempts
+	go controller.cleanupConnectionAttempts()
+
+	// Set the global instance
+	GlobalWebSocketController = controller
 
 	return controller
 }
@@ -49,20 +66,65 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+// Rate limiting constants
+const (
+	connectionCooldown = 500 * time.Millisecond // Minimum time between connection attempts
+)
+
 // HandleConnection handles a WebSocket connection
 func (wsc *WebSocketController) HandleConnection(c *gin.Context) {
-	// Get user ID from context (set by auth middleware)
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	// Always get token from query param
+	token := c.Query("token")
+	if token == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "No token provided"})
 		return
 	}
-	uid := userID.(uint)
+
+	// Validate token
+	claims, err := utils.ValidateJWT(token)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
+		return
+	}
+	uid := claims.UserID
+
+	// Apply rate limiting for connection attempts
+	if !wsc.canConnect(uid) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "Too many connection attempts, please wait"})
+		return
+	}
+
+	// Get room ID
+	roomID := c.Query("room_id")
+	if roomID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No room ID provided"})
+		return
+	}
+
+	// Check if this user already has a connection in this room and close it if they do
+	wsc.clientsMux.Lock()
+	if conns, ok := wsc.clients[uid]; ok {
+		// Close all existing connections for this user
+		for conn := range conns {
+			// Remove from room
+			for r, clients := range wsc.rooms {
+				delete(clients, conn)
+				if len(clients) == 0 {
+					delete(wsc.rooms, r)
+				}
+			}
+			// Close the connection
+			conn.Close()
+		}
+		// Clear all connections for this user
+		delete(wsc.clients, uid)
+	}
+	wsc.clientsMux.Unlock()
 
 	// Upgrade HTTP connection to WebSocket
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		wsc.logger.Errorf("Failed to upgrade connection: %v", err)
+		// Connection upgrade failed
 		return
 	}
 
@@ -72,6 +134,12 @@ func (wsc *WebSocketController) HandleConnection(c *gin.Context) {
 		wsc.clients[uid] = make(map[*websocket.Conn]bool)
 	}
 	wsc.clients[uid][conn] = true
+
+	// Register client in the room
+	if _, ok := wsc.rooms[roomID]; !ok {
+		wsc.rooms[roomID] = make(map[*websocket.Conn]bool)
+	}
+	wsc.rooms[roomID][conn] = true
 	wsc.clientsMux.Unlock()
 
 	// Send connection success message
@@ -80,6 +148,7 @@ func (wsc *WebSocketController) HandleConnection(c *gin.Context) {
 		Data: map[string]interface{}{
 			"message": "Connected to WebSocket server",
 			"user_id": uid,
+			"room_id": roomID,
 		},
 	}
 	connectJSON, _ := json.Marshal(connectMsg)
@@ -88,9 +157,15 @@ func (wsc *WebSocketController) HandleConnection(c *gin.Context) {
 	// Handle client disconnection
 	defer func() {
 		wsc.clientsMux.Lock()
+		// Remove from clients map
 		delete(wsc.clients[uid], conn)
 		if len(wsc.clients[uid]) == 0 {
 			delete(wsc.clients, uid)
+		}
+		// Remove from room map
+		delete(wsc.rooms[roomID], conn)
+		if len(wsc.rooms[roomID]) == 0 {
+			delete(wsc.rooms, roomID)
 		}
 		wsc.clientsMux.Unlock()
 		conn.Close()
@@ -103,24 +178,35 @@ func (wsc *WebSocketController) HandleConnection(c *gin.Context) {
 	for {
 		_, message, err := conn.ReadMessage()
 		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				wsc.logger.Errorf("WebSocket error: %v", err)
-			}
 			break
 		}
 
-		// Process message (could be a heartbeat, chat message, etc.)
+		// Process message
 		var msg WebSocketMessage
 		if err := json.Unmarshal(message, &msg); err != nil {
-			wsc.logger.Errorf("Failed to unmarshal message: %v", err)
 			continue
+		}
+
+		// Check if this message has already been processed to prevent duplicates
+		messageID := string(message)
+		if msg.ChatroomID != "" {
+			wsc.clientsMux.Lock()
+			if _, ok := wsc.processedMessages[msg.ChatroomID]; !ok {
+				wsc.processedMessages[msg.ChatroomID] = make(map[string]bool)
+			}
+			// Skip if already processed
+			if wsc.processedMessages[msg.ChatroomID][messageID] {
+				wsc.clientsMux.Unlock()
+				continue
+			}
+			// Mark as processed
+			wsc.processedMessages[msg.ChatroomID][messageID] = true
+			wsc.clientsMux.Unlock()
 		}
 
 		// Handle different message types
 		switch msg.Type {
 		case "heartbeat":
-			// Update user's heartbeat timestamp
-			// This would typically update the user's status in the database
 			heartbeatMsg := WebSocketMessage{
 				Type: "heartbeat_ack",
 				Data: map[string]string{
@@ -129,14 +215,68 @@ func (wsc *WebSocketController) HandleConnection(c *gin.Context) {
 			}
 			heartbeatJSON, _ := json.Marshal(heartbeatMsg)
 			conn.WriteMessage(websocket.TextMessage, heartbeatJSON)
-
 		case "chat_message":
-			// Broadcast the message to all clients
-			wsc.broadcast <- message
-
-		default:
-			wsc.logger.Warnf("Unknown message type: %s", msg.Type)
+			// Broadcast message only to the specified room
+			if msg.ChatroomID != "" {
+				wsc.clientsMux.RLock()
+				if clients, ok := wsc.rooms[msg.ChatroomID]; ok {
+					for client := range clients {
+						client.WriteMessage(websocket.TextMessage, message)
+					}
+				}
+				wsc.clientsMux.RUnlock()
+			}
 		}
+	}
+}
+
+// canConnect checks if a user can connect (rate limiting)
+func (wsc *WebSocketController) canConnect(uid uint) bool {
+	wsc.connectionAttemptsMux.Lock()
+	defer wsc.connectionAttemptsMux.Unlock()
+
+	lastAttempt, exists := wsc.connectionAttempts[uid]
+	now := time.Now()
+
+	// Allow connection if no previous attempt or enough time has passed
+	if !exists || now.Sub(lastAttempt) > connectionCooldown {
+		wsc.connectionAttempts[uid] = now
+		return true
+	}
+
+	return false
+}
+
+// cleanupConnectionAttempts periodically removes old connection attempts
+func (wsc *WebSocketController) cleanupConnectionAttempts() {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		now := time.Now()
+		wsc.connectionAttemptsMux.Lock()
+		for uid, timestamp := range wsc.connectionAttempts {
+			if now.Sub(timestamp) > 5*time.Minute {
+				delete(wsc.connectionAttempts, uid)
+			}
+		}
+		wsc.connectionAttemptsMux.Unlock()
+
+		// Also clean up processed messages to prevent memory leaks
+		wsc.clientsMux.Lock()
+		for roomID, messages := range wsc.processedMessages {
+			// Check if room still exists
+			if _, exists := wsc.rooms[roomID]; !exists {
+				delete(wsc.processedMessages, roomID)
+				continue
+			}
+			// Remove messages older than 1 hour (not implemented here - would need message timestamps)
+			if len(messages) > 1000 {
+				// If too many messages, just reset the map
+				wsc.processedMessages[roomID] = make(map[string]bool)
+			}
+		}
+		wsc.clientsMux.Unlock()
 	}
 }
 
@@ -145,22 +285,16 @@ func (wsc *WebSocketController) pingClient(conn *websocket.Conn, _ uint) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
-	for {
-		select {
-		case <-ticker.C:
-			if err := conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
-				wsc.logger.Warnf("Failed to ping client: %v", err)
-				return
-			}
+	for range ticker.C {
+		if err := conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
+			return
 		}
 	}
 }
 
 // handleBroadcasts processes messages from the broadcast channel
 func (wsc *WebSocketController) handleBroadcasts() {
-	for {
-		message := <-wsc.broadcast
-
+	for message := range wsc.broadcast {
 		// Parse the message to determine which chatroom it's for
 		var msg WebSocketMessage
 		if err := json.Unmarshal(message, &msg); err != nil {
@@ -168,16 +302,46 @@ func (wsc *WebSocketController) handleBroadcasts() {
 			continue
 		}
 
-		// Send the message to all connected clients
-		wsc.clientsMux.RLock()
-		for _, clients := range wsc.clients {
-			for client := range clients {
-				if err := client.WriteMessage(websocket.TextMessage, message); err != nil {
-					wsc.logger.Errorf("Failed to send message: %v", err)
-					client.Close()
+		// Only broadcast to the specified chatroom
+		if msg.ChatroomID != "" {
+			wsc.clientsMux.RLock()
+			if clients, ok := wsc.rooms[msg.ChatroomID]; ok {
+				for client := range clients {
+					client.WriteMessage(websocket.TextMessage, message)
 				}
 			}
+			wsc.clientsMux.RUnlock()
 		}
-		wsc.clientsMux.RUnlock()
+	}
+}
+
+// BroadcastNewMessage broadcasts a new message to clients in a specific chatroom
+func (wsc *WebSocketController) BroadcastNewMessage(chatroomID string, message interface{}) {
+	if wsc == nil {
+		return // Safety check
+	}
+
+	// Create WebSocket message
+	wsMessage := WebSocketMessage{
+		Type:       "new_message",
+		ChatroomID: chatroomID,
+		Data:       message,
+	}
+
+	// Marshal to JSON
+	jsonMessage, err := json.Marshal(wsMessage)
+	if err != nil {
+		wsc.logger.Errorf("Failed to marshal WebSocket message: %v", err)
+		return
+	}
+
+	// Send to broadcast channel
+	wsc.broadcast <- jsonMessage
+}
+
+// BroadcastNewMessageGlobal is a helper function to broadcast a message using the global controller
+func BroadcastNewMessageGlobal(chatroomID string, message interface{}) {
+	if GlobalWebSocketController != nil {
+		GlobalWebSocketController.BroadcastNewMessage(chatroomID, message)
 	}
 }

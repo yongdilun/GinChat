@@ -178,9 +178,508 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/chatrooms": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieve a list of all available chatrooms",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "chatrooms"
+                ],
+                "summary": "Get all chatrooms",
+                "responses": {
+                    "200": {
+                        "description": "List of chatrooms",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/definitions/models.ChatroomResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "User not authenticated",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Create a new chatroom with the authenticated user as the creator and first member",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "chatrooms"
+                ],
+                "summary": "Create a new chatroom",
+                "parameters": [
+                    {
+                        "description": "Chatroom information",
+                        "name": "chatroom",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.CreateChatroomRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Chatroom created successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "$ref": "#/definitions/models.ChatroomResponse"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "User not authenticated",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Chatroom with this name already exists",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/chatrooms/{id}/join": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Add the authenticated user as a member of the specified chatroom",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "chatrooms"
+                ],
+                "summary": "Join a chatroom",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Chatroom ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Joined chatroom successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid chatroom ID",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "User not authenticated",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Chatroom not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "User is already a member of this chatroom",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/chatrooms/{id}/messages": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieve messages from a chatroom with optional limit parameter",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "messages"
+                ],
+                "summary": "Get messages from a chatroom",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Chatroom ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 50,
+                        "description": "Maximum number of messages to retrieve",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of messages",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/definitions/models.MessageResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid chatroom ID",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "User not authenticated",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "User is not a member of this chatroom",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Chatroom not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Send a message of various types (text, picture, audio, video, or combinations) to a chatroom",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "messages"
+                ],
+                "summary": "Send a message to a chatroom",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Chatroom ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Message information",
+                        "name": "message",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.SendMessageRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Message sent successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "$ref": "#/definitions/models.MessageResponse"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or chatroom ID",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "User not authenticated",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "User is not a member of this chatroom",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Chatroom not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/media/upload": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Upload an image, audio, or video file for use in messages",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "media"
+                ],
+                "summary": "Upload a media file",
+                "parameters": [
+                    {
+                        "enum": [
+                            "picture",
+                            "audio",
+                            "video",
+                            "text_and_picture",
+                            "text_and_audio",
+                            "text_and_video"
+                        ],
+                        "type": "string",
+                        "description": "Message type (picture, audio, video, text_and_picture, text_and_audio, text_and_video)",
+                        "name": "message_type",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Media file to upload",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Media uploaded successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "User not authenticated",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
+        "controllers.CreateChatroomRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "name": {
+                    "description": "The name of the chatroom",
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 3,
+                    "example": "General Chat"
+                }
+            }
+        },
         "controllers.LoginRequest": {
             "type": "object",
             "required": [
@@ -217,6 +716,149 @@ const docTemplate = `{
                     "minLength": 3
                 }
             }
+        },
+        "controllers.SendMessageRequest": {
+            "type": "object",
+            "required": [
+                "message_type"
+            ],
+            "properties": {
+                "media_url": {
+                    "description": "URL of the media (required for picture, audio, video, text_and_picture, text_and_audio, text_and_video)",
+                    "type": "string",
+                    "example": "/media/images/abc123.jpg"
+                },
+                "message_type": {
+                    "description": "Type of message: text, picture, audio, video, text_and_picture, text_and_audio, text_and_video",
+                    "type": "string",
+                    "enum": [
+                        "text",
+                        "picture",
+                        "audio",
+                        "video",
+                        "text_and_picture",
+                        "text_and_audio",
+                        "text_and_video"
+                    ],
+                    "example": "text"
+                },
+                "text_content": {
+                    "description": "Text content of the message (required for text, text_and_picture, text_and_audio, text_and_video)",
+                    "type": "string",
+                    "example": "Hello, how are you?"
+                }
+            }
+        },
+        "models.ChatroomMember": {
+            "type": "object",
+            "properties": {
+                "joined_at": {
+                    "description": "The timestamp when the user joined the chatroom",
+                    "type": "string"
+                },
+                "user_id": {
+                    "description": "The ID of the user",
+                    "type": "integer",
+                    "example": 1
+                },
+                "username": {
+                    "description": "The username of the user",
+                    "type": "string",
+                    "example": "johndoe"
+                }
+            }
+        },
+        "models.ChatroomResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "description": "The timestamp when the chatroom was created",
+                    "type": "string"
+                },
+                "created_by": {
+                    "description": "The ID of the user who created the chatroom",
+                    "type": "integer",
+                    "example": 1
+                },
+                "id": {
+                    "description": "The unique identifier of the chatroom",
+                    "type": "string",
+                    "example": "60d5f8b8e6b5f0b3e8b4b5b3"
+                },
+                "members": {
+                    "description": "The list of members in the chatroom",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.ChatroomMember"
+                    }
+                },
+                "name": {
+                    "description": "The name of the chatroom",
+                    "type": "string",
+                    "example": "General Chat"
+                }
+            }
+        },
+        "models.MessageResponse": {
+            "type": "object",
+            "properties": {
+                "chatroom_id": {
+                    "description": "ID of the chatroom where the message was sent",
+                    "type": "string",
+                    "example": "60d5f8b8e6b5f0b3e8b4b5b4"
+                },
+                "id": {
+                    "description": "Unique identifier of the message",
+                    "type": "string",
+                    "example": "60d5f8b8e6b5f0b3e8b4b5b3"
+                },
+                "media_url": {
+                    "description": "URL of the media",
+                    "type": "string",
+                    "example": "https://example.com/image.jpg"
+                },
+                "message_type": {
+                    "description": "Type of message",
+                    "type": "string",
+                    "enum": [
+                        "text",
+                        "picture",
+                        "audio",
+                        "video",
+                        "text_and_picture",
+                        "text_and_audio",
+                        "text_and_video"
+                    ],
+                    "example": "text"
+                },
+                "sender_id": {
+                    "description": "ID of the user who sent the message",
+                    "type": "integer",
+                    "example": 1
+                },
+                "sender_name": {
+                    "description": "Username of the sender",
+                    "type": "string",
+                    "example": "johndoe"
+                },
+                "sent_at": {
+                    "description": "Timestamp when the message was sent",
+                    "type": "string",
+                    "example": "2023-01-01T12:00:00Z"
+                },
+                "text_content": {
+                    "description": "Text content of the message",
+                    "type": "string",
+                    "example": "Hello, how are you?"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "ApiKeyAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         }
     }
 }`

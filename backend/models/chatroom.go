@@ -17,11 +17,11 @@ type Chatroom struct {
 
 // ChatroomResponse is a struct for returning chatroom data
 type ChatroomResponse struct {
-	ID        string           `json:"id"`
-	Name      string           `json:"name"`
-	CreatedBy uint             `json:"created_by"`
-	CreatedAt time.Time        `json:"created_at"`
-	Members   []ChatroomMember `json:"members"`
+	ID        string           `json:"id" example:"60d5f8b8e6b5f0b3e8b4b5b3"` // The unique identifier of the chatroom
+	Name      string           `json:"name" example:"General Chat"`           // The name of the chatroom
+	CreatedBy uint             `json:"created_by" example:"1"`                // The ID of the user who created the chatroom
+	CreatedAt time.Time        `json:"created_at"`                            // The timestamp when the chatroom was created
+	Members   []ChatroomMember `json:"members"`                               // The list of members in the chatroom
 }
 
 // ToResponse converts a Chatroom to a ChatroomResponse

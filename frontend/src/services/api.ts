@@ -85,6 +85,9 @@ export const chatroomAPI = {
   createChatroom: (name: string) => {
     return api.post('/chatrooms', { name });
   },
+  getChatroomById: (chatroomId: string) => {
+    return api.get(`/chatrooms/${chatroomId}`);
+  },
   joinChatroom: (chatroomId: string) => {
     return api.post(`/chatrooms/${chatroomId}/join`);
   },
@@ -100,6 +103,18 @@ export const messageAPI = {
       message_type: messageType,
       text_content: textContent,
       media_url: mediaURL,
+    });
+  },
+
+  uploadMedia: (file: File, messageType: string) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('message_type', messageType);
+
+    return api.post('/media/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
     });
   },
 };

@@ -12,7 +12,12 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
 
   // Scroll to bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Use a small timeout to ensure the DOM has updated
+    const timer = setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, [messages]);
 
   if (!selectedChatroom) {
@@ -26,12 +31,14 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-900">
+    <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-900 flex flex-col">
+      <div className="flex-1"></div> {/* Spacer to push messages to the bottom */}
       {messages.length > 0 ? (
-        messages.map((message) => (
+        <div className="space-y-4">
+          {messages.map((message) => (
           <div
             key={message.id}
-            className={`mb-4 ${
+            className={`${
               message.sender_id === user?.user_id ? 'text-right' : 'text-left'
             }`}
           >
@@ -47,21 +54,21 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
               {message.media_url && (
                 <div className="mt-2">
                   {message.message_type.includes('picture') ? (
-                    <img 
-                      src={message.media_url} 
-                      alt="Shared image" 
+                    <img
+                      src={message.media_url}
+                      alt="Shared image"
                       className="max-w-xs rounded"
                     />
                   ) : message.message_type.includes('video') ? (
-                    <video 
-                      src={message.media_url} 
-                      controls 
+                    <video
+                      src={message.media_url}
+                      controls
                       className="max-w-xs rounded"
                     />
                   ) : message.message_type.includes('audio') ? (
-                    <audio 
-                      src={message.media_url} 
-                      controls 
+                    <audio
+                      src={message.media_url}
+                      controls
                       className="max-w-xs"
                     />
                   ) : null}
@@ -72,7 +79,8 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
               </p>
             </div>
           </div>
-        ))
+        ))}
+        </div>
       ) : (
         <p className="text-center text-gray-500 dark:text-gray-400 mt-4">
           No messages yet. Start the conversation!

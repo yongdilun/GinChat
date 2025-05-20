@@ -1,14 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
 import ChatSidebar from '@/components/chat/ChatSidebar';
 import ChatHeader from '@/components/chat/ChatHeader';
 import MessageList from '@/components/chat/MessageList';
 import MessageInput from '@/components/chat/MessageInput';
-import { User, Chatroom, Message } from '@/types';
+import { User, Chatroom, Message, WebSocketMessage } from '@/types';
 import { chatroomAPI, messageAPI } from '@/services/api';
+import useWebSocket from '@/hooks/useWebSocket';
 
 export default function ChatPage() {
   const router = useRouter();
@@ -18,6 +19,94 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const disconnectRef = useRef<(() => void) | null>(null);
+  const [wsUrl, setWsUrl] = useState<string>('');
+  // Track processed message IDs to prevent duplication
+  const processedMessageIdsRef = useRef<Set<string>>(new Set());
+
+  // Add a message to the chat if it hasn't been added already
+  const addMessageSafely = useCallback((newMessage: Message) => {
+    // If message has already been processed, ignore it
+    if (processedMessageIdsRef.current.has(newMessage.id)) {
+      console.log('Message already processed, ignoring:', newMessage.id);
+      return;
+    }
+
+    // Mark the message as processed
+    processedMessageIdsRef.current.add(newMessage.id);
+    console.log('Adding new message to chat:', newMessage);
+    
+    // Add to messages state
+    setMessages(prevMessages => [...prevMessages, newMessage]);
+  }, []);
+  
+  // WebSocket connection for real-time updates
+  const handleWebSocketMessage = useCallback((event: MessageEvent) => {
+    try {
+      const wsMessage = JSON.parse(event.data) as WebSocketMessage;
+      console.log('Received WebSocket message:', wsMessage);
+
+      // Handle new message event
+      if (wsMessage.type === 'new_message' && wsMessage.chatroom_id && selectedChatroom?.id === wsMessage.chatroom_id) {
+        const newMessage = wsMessage.data as Message;
+        addMessageSafely(newMessage);
+      } else if (wsMessage.type === 'connected') {
+        console.log('WebSocket connection established:', wsMessage.data);
+      } else {
+        console.log('Received message for different chatroom or unknown type:', wsMessage);
+      }
+    } catch (err) {
+      console.error('Error parsing WebSocket message:', err);
+    }
+  }, [selectedChatroom, addMessageSafely]);
+
+  // Get authentication token for WebSocket
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+
+  // Update wsUrl when selectedChatroom changes
+  useEffect(() => {
+    if (token && selectedChatroom) {
+      const wsBaseUrl = process.env.NEXT_PUBLIC_API_URL?.replace('http', 'ws') || 'ws://localhost:8080';
+      setWsUrl(`${wsBaseUrl}/api/ws?token=${encodeURIComponent(token)}&room_id=${encodeURIComponent(selectedChatroom.id)}`);
+      
+      // Clear processed messages when changing rooms
+      processedMessageIdsRef.current = new Set();
+    } else {
+      setWsUrl('');
+    }
+  }, [token, selectedChatroom]);
+
+  // Create WebSocket connection - always create the hook, even with empty URL
+  const { isConnected, disconnect } = useWebSocket(
+    wsUrl,
+    {
+      onMessage: handleWebSocketMessage,
+      onOpen: () => {
+        console.log('WebSocket connected');
+      },
+      onClose: (event) => {
+        console.log('WebSocket disconnected:', event);
+      },
+      onError: (error) => {
+        console.error('WebSocket error:', error);
+      },
+      headers: token ? { 'Authorization': `Bearer ${token}` } : undefined,
+    }
+  );
+
+  // Store disconnect function in ref and handle cleanup
+  useEffect(() => {
+    // Store the current disconnect function
+    disconnectRef.current = disconnect;
+    
+    // Cleanup function - this runs when the component unmounts or before the next effect runs
+    return () => {
+      if (disconnectRef.current) {
+        disconnectRef.current();
+        disconnectRef.current = null;
+      }
+    };
+  }, [disconnect]); // Only depend on disconnect, not wsUrl
 
   // Check if user is logged in
   useEffect(() => {
@@ -46,9 +135,16 @@ export default function ChatPage() {
       const chatrooms = response.data.chatrooms || [];
       setChatrooms(chatrooms);
 
-      if (chatrooms.length > 0) {
-        setSelectedChatroom(chatrooms[0]);
-        fetchMessages(chatrooms[0].id);
+      // Find the first chatroom that the user is a member of
+      if (chatrooms.length > 0 && user) {
+        const joinedChatroom = chatrooms.find((chatroom: Chatroom) =>
+          chatroom.members.some((member: { user_id: number }) => member.user_id === user.user_id)
+        );
+
+        if (joinedChatroom) {
+          setSelectedChatroom(joinedChatroom);
+          fetchMessages(joinedChatroom.id);
+        }
       }
     } catch (err: any) {
       setError(err.response?.data?.error || 'An error occurred');
@@ -61,7 +157,15 @@ export default function ChatPage() {
   const fetchMessages = async (chatroomId: string) => {
     try {
       const response = await messageAPI.getMessages(chatroomId);
-      setMessages(response.data.messages || []);
+      // Reverse the messages to display oldest first (chronological order)
+      const messagesData = response.data.messages || [];
+      setMessages([...messagesData].reverse());
+      
+      // Clear and repopulate processed message IDs with fetched messages
+      processedMessageIdsRef.current = new Set();
+      messagesData.forEach((msg: Message) => {
+        processedMessageIdsRef.current.add(msg.id);
+      });
     } catch (err: any) {
       console.error('Error fetching messages:', err);
     }
@@ -101,7 +205,13 @@ export default function ChatPage() {
         {/* Chat area */}
         <div className="flex-1 flex flex-col">
           {/* Chat header */}
-          <ChatHeader selectedChatroom={selectedChatroom} />
+          <div className="relative">
+            <ChatHeader selectedChatroom={selectedChatroom} />
+            <div className="absolute top-2 right-2 flex items-center">
+              <span className="text-xs mr-1">WebSocket:</span>
+              <span className={`inline-block w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></span>
+            </div>
+          </div>
 
           {/* Messages */}
           <MessageList
@@ -113,7 +223,13 @@ export default function ChatPage() {
           {/* Message input */}
           <MessageInput
             selectedChatroom={selectedChatroom}
-            onMessageSent={() => selectedChatroom && fetchMessages(selectedChatroom.id)}
+            onMessageSent={(sentMessage) => {
+              // If we got a sent message, add it to the messages list using
+              // our safe add function that prevents duplication
+              if (sentMessage) {
+                addMessageSafely(sentMessage);
+              }
+            }}
           />
         </div>
       </div>
