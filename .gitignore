@@ -80,3 +80,26 @@ vendor/
 # Temporary files
 tmp/
 temp/
+
+# Media files and uploads
+media/
+/media/
+/media/*
+media/uploads/
+backend/media/
+*/media/uploads/*
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.mp4
+*.mp3
+*.pdf
+*.doc
+*.docx
+*.ppt
+*.pptx
+*.xls
+*.xlsx
+*.zip
+*.rar
