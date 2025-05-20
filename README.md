@@ -2,6 +2,16 @@
 
 A modern real-time chat application built with Go (Gin) backend and React (Next.js) frontend.
 
+## Recent Updates
+
+### UI Improvements
+- **Enhanced Chat Interface**: Fixed chat container height (95vh) with proper overflow control and rounded corners
+- **Improved Empty States**: Added comprehensive empty state UI with helpful guidance and visual elements
+- **Interactive Elements**: Added clickable functionality to empty state buttons
+- **Media Handling**: Added image download functionality directly in messages and in expanded viewer
+- **Sidebar Improvements**: Relocated sidebar collapse button inside the header for better UX
+- **Responsive Design**: Improved mobile support and responsive layouts
+
 ## Tech Stack
 
 ### Backend
@@ -21,10 +31,10 @@ A modern real-time chat application built with Go (Gin) backend and React (Next.
 - Next.js
 - TypeScript
 - Tailwind CSS
+- Framer Motion for animations
 - Axios for API requests
-- Socket.io for WebSocket communication
+- WebSockets for real-time communication
 - React Hook Form for form handling
-- Zustand for state management
 
 ## Project Structure
 
@@ -45,10 +55,14 @@ GinChat/
 │   ├── public/          # Static files
 │   ├── src/             # Source code
 │   │   ├── components/  # React components
-│   │   ├── pages/       # Next.js pages
+│   │   │   ├── chat/    # Chat-related components
+│   │   │   ├── auth/    # Authentication components
+│   │   │   └── ui/      # Reusable UI components
+│   │   ├── app/         # Next.js app directory
 │   │   ├── services/    # API services
 │   │   ├── styles/      # CSS styles
 │   │   ├── types/       # TypeScript types
+│   │   ├── hooks/       # Custom React hooks
 │   │   └── utils/       # Utility functions
 │   ├── package.json     # NPM package file
 │   └── tsconfig.json    # TypeScript config
@@ -153,8 +167,12 @@ GinChat/
 - Create and join chat rooms
 - Real-time messaging
 - Message types: text, images, audio, video
+- Media viewing and downloading
+- Collapsible sidebar for better space utilization
+- Interactive empty states with helpful guidance
 - Online status indicators
 - User profiles with avatars
+- Smooth animations and transitions
 
 ## API Documentation
 API documentation is available at `/swagger/index.html` when the backend server is running.

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import Layout from '@/components/Layout';
+import ChatLayout from '@/components/ChatLayout';
 import ChatSidebar from '@/components/chat/ChatSidebar';
 import ChatHeader from '@/components/chat/ChatHeader';
 import MessageList from '@/components/chat/MessageList';
@@ -179,20 +179,20 @@ export default function ChatPage() {
 
   if (isLoading) {
     return (
-      <Layout>
+      <ChatLayout>
         <div className="flex min-h-screen items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto"></div>
             <p className="mt-4">Loading...</p>
           </div>
         </div>
-      </Layout>
+      </ChatLayout>
     );
   }
 
   return (
-    <Layout>
-      <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
+    <ChatLayout>
+      <div className="flex h-[95vh] overflow-hidden bg-gray-100 dark:bg-gray-900 m-2 rounded-lg shadow-lg">
         {/* Sidebar */}
         <ChatSidebar
           user={user}
@@ -203,22 +203,93 @@ export default function ChatPage() {
         />
 
         {/* Chat area */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col overflow-hidden">
           {/* Chat header */}
-          <div className="relative">
-            <ChatHeader selectedChatroom={selectedChatroom} />
-            <div className="absolute top-2 right-2 flex items-center">
-              <span className="text-xs mr-1">WebSocket:</span>
-              <span className={`inline-block w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></span>
-            </div>
-          </div>
-
-          {/* Messages */}
-          <MessageList
-            user={user}
-            selectedChatroom={selectedChatroom}
+          <ChatHeader 
+            selectedChatroom={selectedChatroom} 
             messages={messages}
           />
+
+          {/* Messages */}
+          <div className="flex-1 overflow-hidden">
+            <MessageList
+              user={user}
+              selectedChatroom={selectedChatroom}
+              messages={messages}
+              onShowJoinChatroom={() => {
+                // Find sidebar and check if it's collapsed
+                const sidebarElement = document.querySelector('[data-sidebar]');
+                if (!sidebarElement) return;
+                
+                const isCollapsed = sidebarElement.classList.contains('w-20');
+                
+                if (isCollapsed) {
+                  // Expand sidebar first
+                  const expandButton = sidebarElement.querySelector('button[title="Expand sidebar"]') as HTMLButtonElement;
+                  expandButton?.click();
+                  
+                  // Wait for animation to complete then show join form
+                  setTimeout(() => {
+                    // Click add button
+                    const addButton = document.getElementById('add-chatroom-button') as HTMLButtonElement;
+                    if (addButton) addButton.click();
+                    
+                    // After options panel opens, click join button
+                    setTimeout(() => {
+                      const joinButton = document.getElementById('join-chatroom-button') as HTMLButtonElement;
+                      if (joinButton) joinButton.click();
+                    }, 100);
+                  }, 300);
+                } else {
+                  // Not collapsed, show join directly
+                  // First make sure options are shown
+                  const addButton = document.getElementById('add-chatroom-button') as HTMLButtonElement;
+                  if (addButton) addButton.click();
+                  
+                  setTimeout(() => {
+                    const joinButton = document.getElementById('join-chatroom-button') as HTMLButtonElement;
+                    if (joinButton) joinButton.click();
+                  }, 100);
+                }
+              }}
+              onShowCreateChatroom={() => {
+                // Find sidebar and check if it's collapsed
+                const sidebarElement = document.querySelector('[data-sidebar]');
+                if (!sidebarElement) return;
+                
+                const isCollapsed = sidebarElement.classList.contains('w-20');
+                
+                if (isCollapsed) {
+                  // Expand sidebar first
+                  const expandButton = sidebarElement.querySelector('button[title="Expand sidebar"]') as HTMLButtonElement;
+                  expandButton?.click();
+                  
+                  // Wait for animation to complete then show create form
+                  setTimeout(() => {
+                    // Click add button
+                    const addButton = document.getElementById('add-chatroom-button') as HTMLButtonElement;
+                    if (addButton) addButton.click();
+                    
+                    // After options panel opens, click create button
+                    setTimeout(() => {
+                      const createButton = document.getElementById('create-chatroom-button') as HTMLButtonElement;
+                      if (createButton) createButton.click();
+                    }, 100);
+                  }, 300);
+                } else {
+                  // Not collapsed, show create directly
+                  // First make sure options are shown
+                  const addButton = document.getElementById('add-chatroom-button') as HTMLButtonElement;
+                  if (addButton) addButton.click();
+                  
+                  setTimeout(() => {
+                    const createButton = document.getElementById('create-chatroom-button') as HTMLButtonElement;
+                    if (createButton) createButton.click();
+                  }, 100);
+                }
+              }}
+            />
+          </div>
 
           {/* Message input */}
           <MessageInput
@@ -233,6 +304,6 @@ export default function ChatPage() {
           />
         </div>
       </div>
-    </Layout>
+    </ChatLayout>
   );
 }

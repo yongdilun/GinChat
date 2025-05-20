@@ -127,16 +127,16 @@ const MessageInput: React.FC<MessageInputProps> = ({ selectedChatroom, onMessage
   }
 
   return (
-    <form onSubmit={sendMessage} className="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+    <form onSubmit={sendMessage} className="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
       {/* Media preview */}
       {mediaPreview && (
         <div className="mb-2 relative">
-          <div className="relative rounded-md overflow-hidden border border-gray-300 dark:border-gray-600">
+          <div className="relative rounded-md overflow-hidden border border-gray-300 dark:border-gray-600 max-h-32">
             {mediaType === 'picture' && (
               <img
                 src={mediaPreview}
                 alt="Preview"
-                className="max-h-40 max-w-full object-contain mx-auto"
+                className="max-h-32 max-w-full object-contain mx-auto"
               />
             )}
             {mediaType === 'audio' && (
@@ -150,7 +150,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ selectedChatroom, onMessage
               <video
                 src={mediaPreview}
                 controls
-                className="max-h-40 max-w-full mx-auto"
+                className="max-h-32 max-w-full mx-auto"
               />
             )}
             <button
