@@ -2,15 +2,30 @@
 
 A modern real-time chat application built with Go (Gin) backend and React (Next.js) frontend.
 
-## Recent Updates
+## WebSocket Implementation
 
-### UI Improvements
-- **Enhanced Chat Interface**: Fixed chat container height (95vh) with proper overflow control and rounded corners
-- **Improved Empty States**: Added comprehensive empty state UI with helpful guidance and visual elements
-- **Interactive Elements**: Added clickable functionality to empty state buttons
-- **Media Handling**: Added image download functionality directly in messages and in expanded viewer
-- **Sidebar Improvements**: Relocated sidebar collapse button inside the header for better UX
-- **Responsive Design**: Improved mobile support and responsive layouts
+GinChat uses a bidirectional WebSocket communication layer to enable real-time messaging:
+
+### Backend (Go)
+- **Connection Management**: Uses gorilla/websocket package to handle WebSocket connections
+- **Authentication**: JWT tokens are validated during WebSocket handshake
+- **Room-Based Messaging**: Messages are broadcast only to clients connected to the same chatroom
+- **Concurrency Handling**: Uses Go's goroutines and channels for efficient message broadcasting
+- **Connection Persistence**: Implements heartbeat mechanism to maintain connections
+
+### Frontend (TypeScript)
+- **Custom WebSocket Hook**: React hook that manages connection lifecycle
+- **Automatic Reconnection**: Attempts to reconnect if connection is lost
+- **Message Deduplication**: Tracks processed message IDs to prevent duplicate messages
+- **Typed Message Events**: Uses TypeScript interfaces for type-safe message handling
+- **Chatroom-Specific Connections**: Each chatroom has its own WebSocket connection
+
+### Message Flow
+1. Client establishes WebSocket connection with room ID and JWT token
+2. Server validates token and adds client to room's broadcast list
+3. When a message is sent, it's processed by the server and stored in MongoDB
+4. Server broadcasts the message to all connected clients in the same room
+5. Clients receive the message and update their UI in real-time
 
 ## Tech Stack
 
