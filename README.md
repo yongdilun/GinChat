@@ -2,31 +2,6 @@
 
 A modern real-time chat application built with Go (Gin) backend and React (Next.js) frontend.
 
-## WebSocket Implementation
-
-GinChat uses a bidirectional WebSocket communication layer to enable real-time messaging:
-
-### Backend (Go)
-- **Connection Management**: Uses gorilla/websocket package to handle WebSocket connections
-- **Authentication**: JWT tokens are validated during WebSocket handshake
-- **Room-Based Messaging**: Messages are broadcast only to clients connected to the same chatroom
-- **Concurrency Handling**: Uses Go's goroutines and channels for efficient message broadcasting
-- **Connection Persistence**: Implements heartbeat mechanism to maintain connections
-
-### Frontend (TypeScript)
-- **Custom WebSocket Hook**: React hook that manages connection lifecycle
-- **Automatic Reconnection**: Attempts to reconnect if connection is lost
-- **Message Deduplication**: Tracks processed message IDs to prevent duplicate messages
-- **Typed Message Events**: Uses TypeScript interfaces for type-safe message handling
-- **Chatroom-Specific Connections**: Each chatroom has its own WebSocket connection
-
-### Message Flow
-1. Client establishes WebSocket connection with room ID and JWT token
-2. Server validates token and adds client to room's broadcast list
-3. When a message is sent, it's processed by the server and stored in MongoDB
-4. Server broadcasts the message to all connected clients in the same room
-5. Clients receive the message and update their UI in real-time
-
 ## Tech Stack
 
 ### Backend
@@ -188,6 +163,31 @@ GinChat/
 - Online status indicators
 - User profiles with avatars
 - Smooth animations and transitions
+
+## WebSocket Implementation
+
+GinChat uses a bidirectional WebSocket communication layer to enable real-time messaging:
+
+### Backend (Go)
+- **Connection Management**: Uses gorilla/websocket package to handle WebSocket connections
+- **Authentication**: JWT tokens are validated during WebSocket handshake
+- **Room-Based Messaging**: Messages are broadcast only to clients connected to the same chatroom
+- **Concurrency Handling**: Uses Go's goroutines and channels for efficient message broadcasting
+- **Connection Persistence**: Implements heartbeat mechanism to maintain connections
+
+### Frontend (TypeScript)
+- **Custom WebSocket Hook**: React hook that manages connection lifecycle
+- **Automatic Reconnection**: Attempts to reconnect if connection is lost
+- **Message Deduplication**: Tracks processed message IDs to prevent duplicate messages
+- **Typed Message Events**: Uses TypeScript interfaces for type-safe message handling
+- **Chatroom-Specific Connections**: Each chatroom has its own WebSocket connection
+
+### Message Flow
+1. Client establishes WebSocket connection with room ID and JWT token
+2. Server validates token and adds client to room's broadcast list
+3. When a message is sent, it's processed by the server and stored in MongoDB
+4. Server broadcasts the message to all connected clients in the same room
+5. Clients receive the message and update their UI in real-time
 
 ## API Documentation
 API documentation is available at `/swagger/index.html` when the backend server is running.
