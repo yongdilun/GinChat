@@ -90,13 +90,18 @@ func initMySQL() {
 		// Construct the DSN for GORM
 		dsn = fmt.Sprintf("%s@tcp(%s)/%s", credentials, host, dbParams)
 
+		// Add parseTime if not already in params
+		if !strings.Contains(dsn, "parseTime") {
+			if strings.Contains(dsn, "?") {
+				dsn += "&parseTime=True"
+			} else {
+				dsn += "?parseTime=True"
+			}
+		}
+
 		// Add SSL requirement if not already in params
 		if !strings.Contains(dsn, "ssl-mode") && !strings.Contains(dsn, "tls") {
-			if strings.Contains(dsn, "?") {
-				dsn += "&tls=true"
-			} else {
-				dsn += "?tls=true"
-			}
+			dsn += "&tls=true"
 		}
 
 		// Replace ssl-mode=REQUIRED with tls=skip-verify for GORM compatibility

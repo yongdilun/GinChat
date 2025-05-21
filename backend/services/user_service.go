@@ -36,7 +36,7 @@ func (s *UserService) Register(username, email, password, role string) (*models.
 	}
 
 	// Create new user
-	now := time.Now()
+	now := models.CustomTime{Time: time.Now()}
 	user := models.User{
 		Username:  username,
 		Email:     email,
@@ -71,9 +71,10 @@ func (s *UserService) Login(email, password string) (*models.User, error) {
 	// Update user status
 	user.IsLogin = true
 	user.Status = "online"
-	now := time.Now()
-	user.LastLoginAt = &now
-	user.Heartbeat = &now
+	now := models.CustomTime{Time: time.Now()}
+	customTimePtr := &now
+	user.LastLoginAt = customTimePtr
+	user.Heartbeat = customTimePtr
 	s.DB.Save(&user)
 
 	return &user, nil
@@ -148,6 +149,6 @@ func (s *UserService) ToResponse(user *models.User) models.UserResponse {
 		Role:      user.Role,
 		Status:    user.Status,
 		AvatarURL: user.AvatarURL,
-		CreatedAt: user.CreatedAt,
+		CreatedAt: user.CreatedAt.Time,
 	}
 }
