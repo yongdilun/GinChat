@@ -2,23 +2,31 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+
+// Check if we're in a browser environment
+const isBrowser = typeof window !== 'undefined';
 
 const Navbar = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
 
   useEffect(() => {
-    // Check if user is logged in
-    const token = localStorage.getItem('token');
-    setIsLoggedIn(!!token);
+    // Check if user is logged in - only run in browser
+    if (isBrowser) {
+      const token = localStorage.getItem('token');
+      setIsLoggedIn(!!token);
+    }
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    window.location.href = '/auth/login?session=logout';
+    if (isBrowser) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      router.push('/auth/login?session=logout');
+    }
   };
 
   const toggleMenu = () => {
