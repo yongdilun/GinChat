@@ -1,8 +1,6 @@
 package services
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ginchat/utils"
 )
 
 // MediaService handles media file operations
@@ -33,40 +32,14 @@ func NewMediaService(basePath, baseURL string) *MediaService {
 	}
 }
 
-// MediaType represents the type of media file
-type MediaType string
-
-const (
-	// ImageMedia represents image files
-	ImageMedia MediaType = "image"
-	// AudioMedia represents audio files
-	AudioMedia MediaType = "audio"
-	// VideoMedia represents video files
-	VideoMedia MediaType = "video"
-)
-
-// GetMediaTypeFromMessageType returns the media type based on the message type
-func GetMediaTypeFromMessageType(messageType string) MediaType {
-	switch messageType {
-	case "picture", "text_and_picture":
-		return ImageMedia
-	case "audio", "text_and_audio":
-		return AudioMedia
-	case "video", "text_and_video":
-		return VideoMedia
-	default:
-		return ""
-	}
-}
-
 // GetMediaFolder returns the folder path for a specific media type
-func (s *MediaService) GetMediaFolder(mediaType MediaType) string {
+func (s *MediaService) GetMediaFolder(mediaType utils.MediaType) string {
 	switch mediaType {
-	case ImageMedia:
+	case utils.ImageMedia:
 		return filepath.Join(s.BasePath, "uploads/images")
-	case AudioMedia:
+	case utils.AudioMedia:
 		return filepath.Join(s.BasePath, "uploads/audio")
-	case VideoMedia:
+	case utils.VideoMedia:
 		return filepath.Join(s.BasePath, "uploads/video")
 	default:
 		return filepath.Join(s.BasePath, "uploads")
@@ -74,7 +47,7 @@ func (s *MediaService) GetMediaFolder(mediaType MediaType) string {
 }
 
 // UploadFile uploads a file to the appropriate folder and returns the URL
-func (s *MediaService) UploadFile(file *multipart.FileHeader, mediaType MediaType) (string, error) {
+func (s *MediaService) UploadFile(file *multipart.FileHeader, mediaType utils.MediaType) (string, error) {
 	// Validate file size (10MB max)
 	if file.Size > 10*1024*1024 {
 		return "", errors.New("file size exceeds the 10MB limit")
@@ -89,7 +62,7 @@ func (s *MediaService) UploadFile(file *multipart.FileHeader, mediaType MediaTyp
 	}
 
 	// Generate a unique filename
-	randomID, err := generateRandomID(16)
+	randomID, err := utils.GenerateRandomID(16)
 	if err != nil {
 		return "", err
 	}
@@ -127,13 +100,13 @@ func (s *MediaService) UploadFile(file *multipart.FileHeader, mediaType MediaTyp
 }
 
 // getMediaTypeFolder returns the folder name for a specific media type
-func (s *MediaService) getMediaTypeFolder(mediaType MediaType) string {
+func (s *MediaService) getMediaTypeFolder(mediaType utils.MediaType) string {
 	switch mediaType {
-	case ImageMedia:
+	case utils.ImageMedia:
 		return "images"
-	case AudioMedia:
+	case utils.AudioMedia:
 		return "audio"
-	case VideoMedia:
+	case utils.VideoMedia:
 		return "video"
 	default:
 		return "uploads"
@@ -141,15 +114,15 @@ func (s *MediaService) getMediaTypeFolder(mediaType MediaType) string {
 }
 
 // isValidFileExtension checks if the file extension is valid for the specified media type
-func (s *MediaService) isValidFileExtension(ext string, mediaType MediaType) bool {
+func (s *MediaService) isValidFileExtension(ext string, mediaType utils.MediaType) bool {
 	ext = strings.ToLower(ext)
 
 	switch mediaType {
-	case ImageMedia:
+	case utils.ImageMedia:
 		return ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".gif" || ext == ".webp"
-	case AudioMedia:
+	case utils.AudioMedia:
 		return ext == ".mp3" || ext == ".wav" || ext == ".ogg" || ext == ".m4a"
-	case VideoMedia:
+	case utils.VideoMedia:
 		return ext == ".mp4" || ext == ".webm" || ext == ".mov" || ext == ".avi"
 	default:
 		return false
@@ -160,13 +133,4 @@ func (s *MediaService) isValidFileExtension(ext string, mediaType MediaType) boo
 func SetupMediaRoutes(router *gin.Engine, basePath string) {
 	// Serve static files from the media directory
 	router.Static("/media", filepath.Join(basePath, "uploads"))
-}
-
-// generateRandomID generates a random ID of the specified length
-func generateRandomID(length int) (string, error) {
-	bytes := make([]byte, length)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(bytes), nil
 }

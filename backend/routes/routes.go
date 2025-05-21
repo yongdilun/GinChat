@@ -29,13 +29,8 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, mongodb *mongo.Database, logger *lo
 	// messageController := controllers.NewMessageController(db, messageService)
 	websocketController := controllers.NewWebSocketController(logger)
 
-	// Create media controller
-	// Get base URL from environment or use default
-	baseURL := "http://localhost:8080"
-	if envBaseURL := gin.Mode(); envBaseURL == gin.ReleaseMode {
-		baseURL = "https://your-production-domain.com" // Replace with your production domain
-	}
-	mediaController := controllers.NewMediaController("./media", baseURL)
+	// Create media controller with Cloudinary
+	mediaController := controllers.NewMediaController()
 
 	// Health check endpoint
 	r.GET("/health", func(c *gin.Context) {
@@ -78,9 +73,6 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, mongodb *mongo.Database, logger *lo
 		// WebSocket route OUTSIDE protected group
 		api.GET("/ws", websocketController.HandleConnection)
 	}
-
-	// Setup static file serving for media files
-	r.Static("/media", "./media/uploads")
 
 	// Debug route for WebSocket connection
 	r.GET("/api/ws-debug", func(c *gin.Context) {

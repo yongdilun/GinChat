@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/ginchat/models"
@@ -62,16 +63,70 @@ func main() {
 
 // initMySQL initializes the MySQL database with test data
 func initMySQL() (*gorm.DB, error) {
-	// Get database connection details from environment variables
-	dbUser := getEnv("MYSQL_USER", "root")
-	dbPassword := getEnv("MYSQL_PASSWORD", "password")
-	dbHost := getEnv("MYSQL_HOST", "localhost")
-	dbPort := getEnv("MYSQL_PORT", "3306")
-	dbName := getEnv("MYSQL_DATABASE", "ginchat")
+	// Check if we have a full URI
+	mysqlURI := os.Getenv("MYSQL_URI")
+	var dsn string
 
-	// Create DSN string
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
-		dbUser, dbPassword, dbHost, dbPort, dbName)
+	if mysqlURI != "" {
+		// Parse the URI to extract components
+		// Format: mysql://user:pass@host:port/dbname?params
+		// We need to convert it to GORM format: user:pass@tcp(host:port)/dbname?params
+
+		// Remove the mysql:// prefix
+		cleanURI := strings.TrimPrefix(mysqlURI, "mysql://")
+
+		// Split by @ to separate credentials from host
+		parts := strings.Split(cleanURI, "@")
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid MySQL URI format")
+		}
+
+		credentials := parts[0]
+		hostPart := parts[1]
+
+		// Split host part by / to separate host:port from dbname?params
+		hostDbParts := strings.SplitN(hostPart, "/", 2)
+		if len(hostDbParts) != 2 {
+			return nil, fmt.Errorf("invalid MySQL URI format")
+		}
+
+		host := hostDbParts[0]
+		dbParams := hostDbParts[1]
+
+		// Construct the DSN for GORM
+		dsn = fmt.Sprintf("%s@tcp(%s)/%s", credentials, host, dbParams)
+
+		// Add SSL requirement if not already in params
+		if !strings.Contains(dsn, "ssl-mode") && !strings.Contains(dsn, "tls") {
+			if strings.Contains(dsn, "?") {
+				dsn += "&tls=true"
+			} else {
+				dsn += "?tls=true"
+			}
+		}
+
+		// Replace ssl-mode=REQUIRED with tls=skip-verify for GORM compatibility
+		// This skips certificate verification which is needed for cloud databases
+		dsn = strings.Replace(dsn, "ssl-mode=REQUIRED", "tls=skip-verify", 1)
+
+		log.Println("Connecting to MySQL with URI-derived DSN")
+	} else {
+		// Fallback to individual parameters
+		dbUser := getEnv("MYSQL_USER", "root")
+		dbPassword := getEnv("MYSQL_PASSWORD", "password")
+		dbHost := getEnv("MYSQL_HOST", "localhost")
+		dbPort := getEnv("MYSQL_PORT", "3306")
+		dbName := getEnv("MYSQL_DATABASE", "ginchat")
+
+		// Create DSN string
+		dsn = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+			dbUser, dbPassword, dbHost, dbPort, dbName)
+
+		// Add SSL if required
+		if os.Getenv("MYSQL_SSL_MODE") == "REQUIRED" {
+			dsn += "&tls=skip-verify"
+		}
+	}
 
 	// Connect to database
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
@@ -81,12 +136,15 @@ func initMySQL() (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to connect to MySQL: %v", err)
 	}
 
-	log.Println("Connected to MySQL database")
+	log.Println("Connected to MySQL database successfully")
+
+	// Get the database name from environment
+	dbName := getEnv("MYSQL_DATABASE", "defaultdb")
 
 	// Check if the users table exists
 	var tableExists bool
 	err = db.Raw("SELECT 1 FROM information_schema.tables WHERE table_schema = ? AND table_name = ?",
-		"ginchat", "users").Scan(&tableExists).Error
+		dbName, "users").Scan(&tableExists).Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to check if users table exists: %v", err)
 	}
@@ -155,18 +213,56 @@ func initMySQL() (*gorm.DB, error) {
 
 // initMongoDB initializes the MongoDB database with test data
 func initMongoDB() (*mongo.Database, error) {
-	// Get database connection details from environment variables
-	dbHost := getEnv("MONGO_HOST", "localhost")
-	dbPort := getEnv("MONGO_PORT", "27017")
+	// Get MongoDB URI from environment variables
+	mongoURI := os.Getenv("MONGO_URI")
+	var uri string
+
+	if mongoURI != "" {
+		// Use the provided MongoDB Atlas URI
+		uri = mongoURI
+		log.Println("Using MongoDB Atlas connection string")
+	} else {
+		// Fallback to individual parameters for local development
+		dbHost := getEnv("MONGO_HOST", "localhost")
+		dbPort := getEnv("MONGO_PORT", "27017")
+
+		// Create connection URI for local development without authentication
+		uri = fmt.Sprintf("mongodb://%s:%s", dbHost, dbPort)
+		log.Printf("Using local MongoDB connection: host=%s, port=%s", dbHost, dbPort)
+	}
+
+	// Get database name
 	dbName := getEnv("MONGO_DATABASE", "ginchat")
 
-	log.Printf("MongoDB connection: Using host=%s, port=%s, database=%s", dbHost, dbPort, dbName)
+	// Set client options with proper credentials
+	clientOptions := options.Client()
 
-	// Create connection URI for local development without authentication
-	uri := fmt.Sprintf("mongodb://%s:%s", dbHost, dbPort)
+	// If using MongoDB Atlas, ensure we have the right format
+	if strings.Contains(uri, "mongodb+srv://") {
+		// Parse the URI to extract credentials if needed
+		if !strings.Contains(uri, dbName) {
+			// Add database name if not in the URI
+			if strings.Contains(uri, "?") {
+				uri = strings.Replace(uri, "?", "/"+dbName+"?", 1)
+			} else {
+				uri = uri + "/" + dbName
+			}
+		}
 
-	// Set client options
-	clientOptions := options.Client().ApplyURI(uri)
+		// Add additional options for Atlas
+		if !strings.Contains(uri, "retryWrites=true") {
+			if strings.Contains(uri, "?") {
+				uri += "&retryWrites=true&w=majority"
+			} else {
+				uri += "?retryWrites=true&w=majority"
+			}
+		}
+
+		log.Printf("Using MongoDB Atlas URI: %s", uri)
+	}
+
+	// Apply the URI
+	clientOptions.ApplyURI(uri)
 
 	// Connect to MongoDB
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -183,11 +279,11 @@ func initMongoDB() (*mongo.Database, error) {
 		return nil, fmt.Errorf("failed to ping MongoDB: %v", err)
 	}
 
-	log.Println("Connected to MongoDB database")
+	log.Println("Connected to MongoDB database successfully")
 
 	// Get database
 	db := client.Database(dbName)
-	log.Printf("Connected to MongoDB database: %s", dbName)
+	log.Printf("Using MongoDB database: %s", dbName)
 
 	// Create collections if they don't exist
 	collections, err := db.ListCollectionNames(ctx, bson.D{})

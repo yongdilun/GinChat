@@ -1,23 +1,32 @@
 package controllers
 
 import (
+	"log"
 	"net/http"
 	"path/filepath"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ginchat/services"
+	"github.com/ginchat/utils"
 )
 
 // MediaController handles media-related requests
 type MediaController struct {
-	MediaService *services.MediaService
+	CloudinaryService *services.CloudinaryService
 }
 
 // NewMediaController creates a new MediaController
-func NewMediaController(basePath, baseURL string) *MediaController {
-	mediaService := services.NewMediaService(basePath, baseURL)
+func NewMediaController() *MediaController {
+	cloudinaryService, err := services.NewCloudinaryService()
+	if err != nil {
+		log.Printf("Error initializing Cloudinary service: %v", err)
+		// Return a controller with nil service, we'll handle this in the handler
+		return &MediaController{
+			CloudinaryService: nil,
+		}
+	}
 	return &MediaController{
-		MediaService: mediaService,
+		CloudinaryService: cloudinaryService,
 	}
 }
 
@@ -41,6 +50,12 @@ type UploadMediaRequest struct {
 // @Failure 500 {object} map[string]string "Internal server error"
 // @Router /media/upload [post]
 func (mc *MediaController) UploadMedia(c *gin.Context) {
+	// Check if Cloudinary service is initialized
+	if mc.CloudinaryService == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Cloudinary service not initialized. Check your environment variables."})
+		return
+	}
+
 	// Get user ID from context (set by auth middleware)
 	_, exists := c.Get("user_id")
 	if !exists {
@@ -63,14 +78,14 @@ func (mc *MediaController) UploadMedia(c *gin.Context) {
 	}
 
 	// Determine media type from message type
-	mediaType := services.GetMediaTypeFromMessageType(req.MessageType)
+	mediaType := utils.GetMediaTypeFromMessageType(req.MessageType)
 	if mediaType == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message type for media upload"})
 		return
 	}
 
-	// Upload the file
-	mediaURL, err := mc.MediaService.UploadFile(file, mediaType)
+	// Upload the file to Cloudinary
+	mediaURL, err := mc.CloudinaryService.UploadFile(file, mediaType)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -78,8 +93,8 @@ func (mc *MediaController) UploadMedia(c *gin.Context) {
 
 	// Return the media URL
 	c.JSON(http.StatusCreated, gin.H{
-		"media_url": mediaURL,
-		"file_name": filepath.Base(mediaURL),
+		"media_url":    mediaURL,
+		"file_name":    filepath.Base(mediaURL),
 		"message_type": req.MessageType,
 	})
 }

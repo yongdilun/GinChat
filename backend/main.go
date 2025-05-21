@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -56,13 +57,68 @@ func initLogger() {
 }
 
 func initMySQL() {
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
-		os.Getenv("MYSQL_USER"),
-		os.Getenv("MYSQL_PASSWORD"),
-		os.Getenv("MYSQL_HOST"),
-		os.Getenv("MYSQL_PORT"),
-		os.Getenv("MYSQL_DATABASE"),
-	)
+	// Check if we have a full URI
+	mysqlURI := os.Getenv("MYSQL_URI")
+	var dsn string
+
+	if mysqlURI != "" {
+		// Parse the URI to extract components
+		// Format: mysql://user:pass@host:port/dbname?params
+		// We need to convert it to GORM format: user:pass@tcp(host:port)/dbname?params
+
+		// Remove the mysql:// prefix
+		cleanURI := strings.TrimPrefix(mysqlURI, "mysql://")
+
+		// Split by @ to separate credentials from host
+		parts := strings.Split(cleanURI, "@")
+		if len(parts) != 2 {
+			logger.Fatalf("Invalid MySQL URI format")
+		}
+
+		credentials := parts[0]
+		hostPart := parts[1]
+
+		// Split host part by / to separate host:port from dbname?params
+		hostDbParts := strings.SplitN(hostPart, "/", 2)
+		if len(hostDbParts) != 2 {
+			logger.Fatalf("Invalid MySQL URI format")
+		}
+
+		host := hostDbParts[0]
+		dbParams := hostDbParts[1]
+
+		// Construct the DSN for GORM
+		dsn = fmt.Sprintf("%s@tcp(%s)/%s", credentials, host, dbParams)
+
+		// Add SSL requirement if not already in params
+		if !strings.Contains(dsn, "ssl-mode") && !strings.Contains(dsn, "tls") {
+			if strings.Contains(dsn, "?") {
+				dsn += "&tls=true"
+			} else {
+				dsn += "?tls=true"
+			}
+		}
+
+		// Replace ssl-mode=REQUIRED with tls=skip-verify for GORM compatibility
+		// This skips certificate verification which is needed for cloud databases
+		dsn = strings.Replace(dsn, "ssl-mode=REQUIRED", "tls=skip-verify", 1)
+
+		logger.Infof("Connecting to MySQL with URI-derived DSN")
+	} else {
+		// Fallback to individual parameters
+		dsn = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+			os.Getenv("MYSQL_USER"),
+			os.Getenv("MYSQL_PASSWORD"),
+			os.Getenv("MYSQL_HOST"),
+			os.Getenv("MYSQL_PORT"),
+			os.Getenv("MYSQL_DATABASE"),
+		)
+
+		// Add SSL if required
+		if os.Getenv("MYSQL_SSL_MODE") == "REQUIRED" {
+			dsn += "&tls=skip-verify"
+		}
+	}
 
 	var err error
 	mysqlDB, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
@@ -70,41 +126,55 @@ func initMySQL() {
 		logger.Fatalf("Failed to connect to MySQL: %v", err)
 	}
 
-	logger.Info("Connected to MySQL database")
+	logger.Info("Connected to MySQL database successfully")
 }
 
 func initMongoDB() {
-	// Get database connection details from environment variables
-	dbUser := os.Getenv("MONGO_USER")
-	dbPassword := os.Getenv("MONGO_PASSWORD")
-	dbHost := os.Getenv("MONGO_HOST")
-	if dbHost == "" {
-		dbHost = "localhost"
+	// Get MongoDB URI from environment variables
+	mongoURI := os.Getenv("MONGO_URI")
+	if mongoURI == "" {
+		logger.Fatal("MONGO_URI environment variable is not set")
 	}
-	dbPort := os.Getenv("MONGO_PORT")
-	if dbPort == "" {
-		dbPort = "27017"
-	}
+
+	// Get database name from environment variables
 	dbName := os.Getenv("MONGO_DATABASE")
 	if dbName == "" {
 		dbName = "ginchat"
 	}
 
-	// Create connection URI
-	var mongoURI string
-	if dbUser != "" && dbPassword != "" {
-		// With authentication
-		mongoURI = fmt.Sprintf("mongodb://%s:%s@%s:%s/%s",
-			dbUser, dbPassword, dbHost, dbPort, dbName)
-	} else {
-		// Without authentication (local development)
-		mongoURI = fmt.Sprintf("mongodb://%s:%s/%s",
-			dbHost, dbPort, dbName)
+	logger.Infof("Connecting to MongoDB Atlas with database: %s", dbName)
+
+	// Set client options with proper credentials
+	clientOptions := options.Client()
+
+	// If using MongoDB Atlas, ensure we have the right format
+	if strings.Contains(mongoURI, "mongodb+srv://") {
+		// Parse the URI to extract credentials if needed
+		if !strings.Contains(mongoURI, dbName) {
+			// Add database name if not in the URI
+			if strings.Contains(mongoURI, "?") {
+				mongoURI = strings.Replace(mongoURI, "?", "/"+dbName+"?", 1)
+			} else {
+				mongoURI = mongoURI + "/" + dbName
+			}
+		}
+
+		// Add additional options for Atlas
+		if !strings.Contains(mongoURI, "retryWrites=true") {
+			if strings.Contains(mongoURI, "?") {
+				mongoURI += "&retryWrites=true&w=majority"
+			} else {
+				mongoURI += "?retryWrites=true&w=majority"
+			}
+		}
+
+		logger.Infof("Using MongoDB Atlas URI: %s", mongoURI)
 	}
 
-	logger.Infof("Connecting to MongoDB at %s:%s/%s", dbHost, dbPort, dbName)
+	// Apply the URI
+	clientOptions.ApplyURI(mongoURI)
 
-	clientOptions := options.Client().ApplyURI(mongoURI)
+	// Connect to MongoDB
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -113,13 +183,14 @@ func initMongoDB() {
 		logger.Fatalf("Failed to connect to MongoDB: %v", err)
 	}
 
+	// Ping the database to verify connection
 	err = client.Ping(ctx, nil)
 	if err != nil {
 		logger.Fatalf("Failed to ping MongoDB: %v", err)
 	}
 
 	mongoDB = client.Database(dbName)
-	logger.Info("Connected to MongoDB database")
+	logger.Info("Connected to MongoDB Atlas database successfully")
 }
 
 func setupRouter() *gin.Engine {
