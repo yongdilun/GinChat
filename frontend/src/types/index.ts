@@ -84,9 +84,3 @@ export interface WebSocketMessage {
   chatroom_id?: string;
   data: unknown;
 }
-
-// Replace any with unknown or a more specific type
-type ApiResponse = {
-  data: unknown;
-  error?: string;
-};

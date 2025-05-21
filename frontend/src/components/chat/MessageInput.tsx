@@ -1,10 +1,11 @@
 import { useState, useRef } from 'react';
-import { Chatroom } from '@/types';
+import Image from 'next/image';
+import { Chatroom, Message } from '@/types';
 import { messageAPI } from '@/services/api';
 
 interface MessageInputProps {
   selectedChatroom: Chatroom | null;
-  onMessageSent: (message?: any) => void;
+  onMessageSent: (message?: Message) => void;
 }
 
 interface ApiError {
@@ -147,11 +148,14 @@ const MessageInput: React.FC<MessageInputProps> = ({ selectedChatroom, onMessage
         <div className="mb-2 relative">
           <div className="relative rounded-md overflow-hidden border border-gray-300 dark:border-gray-600 max-h-32">
             {mediaType === 'picture' && (
-              <img
-                src={mediaPreview}
-                alt="Preview"
-                className="max-h-32 max-w-full object-contain mx-auto"
-              />
+              <div className="relative w-full h-32">
+                <Image
+                  src={mediaPreview}
+                  alt="Preview"
+                  fill
+                  className="object-contain"
+                />
+              </div>
             )}
             {mediaType === 'audio' && (
               <audio

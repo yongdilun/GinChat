@@ -1,6 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import webSocketManager from '@/services/websocket';
 
+// Define message type for WebSocket messages
+interface WebSocketData {
+  type: string;
+  data: unknown;
+  chatroom_id?: string;
+}
+
 interface WebSocketOptions {
   onMessage?: (event: MessageEvent) => void;
   onOpen?: (event: Event) => void;
@@ -9,16 +16,11 @@ interface WebSocketOptions {
   headers?: Record<string, string>;
 }
 
-interface WebSocketError extends Error {
-  code?: number;
-  reason?: string;
-}
-
 export const useWebSocket = (url: string, options: WebSocketOptions = {}) => {
   const [isConnected, setIsConnected] = useState(false);
-  const [lastMessage, setLastMessage] = useState<any | null>(null);
+  const [lastMessage, setLastMessage] = useState<WebSocketData | null>(null);
   const urlRef = useRef<string>(url);
-  const messageHandlerRef = useRef<((data: any) => void) | null>(null);
+  const messageHandlerRef = useRef<((data: WebSocketData) => void) | null>(null);
 
   const {
     onOpen,
@@ -68,7 +70,7 @@ export const useWebSocket = (url: string, options: WebSocketOptions = {}) => {
     }
 
     // Create message handler
-    const messageHandler = (data: any) => {
+    const messageHandler = (data: WebSocketData) => {
       setLastMessage(data);
       if (onMessage) {
         // Create a MessageEvent-like object
@@ -101,7 +103,7 @@ export const useWebSocket = (url: string, options: WebSocketOptions = {}) => {
   }, [cleanup]);
 
   // Send message to WebSocket
-  const sendMessage = useCallback((data: string | object) => {
+  const sendMessage = useCallback((data: string | Record<string, unknown>) => {
     if (!urlRef.current) return false;
     return webSocketManager.send(urlRef.current, data);
   }, []);

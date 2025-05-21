@@ -1,6 +1,10 @@
 'use client';
 
-import { WebSocketMessage } from '@/types';
+interface WebSocketMessageData {
+  type: string;
+  data: unknown;
+  chatroom_id?: string;
+}
 
 interface WebSocketOptions {
   onOpen?: () => void;
@@ -24,7 +28,7 @@ interface WebSocketResponse {
 class WebSocketManager {
   private static instance: WebSocketManager;
   private connections: Map<string, WebSocket> = new Map();
-  private messageHandlers: Map<string, Set<(data: any) => void>> = new Map();
+  private messageHandlers: Map<string, Set<(data: WebSocketMessageData) => void>> = new Map();
   private connectionAttempts: Map<string, number> = new Map();
   private reconnectTimers: Map<string, NodeJS.Timeout> = new Map();
   private connectionLocks: Map<string, boolean> = new Map();
@@ -85,7 +89,7 @@ class WebSocketManager {
       this.connectionAttempts.set(url, attempts + 1);
 
       // Set up event handlers
-      ws.onopen = (event) => {
+      ws.onopen = () => {
         console.log(`WebSocket connected to ${url}`);
         // Reset connection attempts on successful connection
         this.connectionAttempts.set(url, 0);
@@ -98,7 +102,7 @@ class WebSocketManager {
 
       ws.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data);
+          const data = JSON.parse(event.data) as WebSocketMessageData;
           // Notify all registered handlers for this URL
           const handlers = this.messageHandlers.get(url);
           if (handlers) {
@@ -177,7 +181,7 @@ class WebSocketManager {
   }
 
   // Add a message handler for a specific URL
-  addMessageHandler(url: string, handler: (data: any) => void): void {
+  addMessageHandler(url: string, handler: (data: WebSocketMessageData) => void): void {
     if (!this.messageHandlers.has(url)) {
       this.messageHandlers.set(url, new Set());
     }
@@ -185,7 +189,7 @@ class WebSocketManager {
   }
 
   // Remove a message handler for a specific URL
-  removeMessageHandler(url: string, handler: (data: any) => void): void {
+  removeMessageHandler(url: string, handler: (data: WebSocketMessageData) => void): void {
     const handlers = this.messageHandlers.get(url);
     if (handlers) {
       handlers.delete(handler);
@@ -202,7 +206,7 @@ class WebSocketManager {
   }
 
   // Send a message to a specific URL
-  send(url: string, message: any): boolean {
+  send(url: string, message: string | Record<string, unknown>): boolean {
     const ws = this.connections.get(url);
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(typeof message === 'string' ? message : JSON.stringify(message));

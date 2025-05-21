@@ -129,8 +129,9 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
       if (newChatroom) {
         onSelectChatroom(newChatroom);
       }
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to create chatroom');
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { error?: string } } };
+      setError(error.response?.data?.error || 'Failed to create chatroom');
     } finally {
       setIsCreating(false);
     }
@@ -161,8 +162,9 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
       if (joinedChatroom) {
         onSelectChatroom(joinedChatroom);
       }
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to join chatroom');
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { error?: string } } };
+      setError(error.response?.data?.error || 'Failed to join chatroom');
     } finally {
       setIsJoining(false);
       setJoiningChatroomId(null);

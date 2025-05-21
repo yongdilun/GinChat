@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
+import Image from 'next/image';
 import { User, Chatroom, Message } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { XIcon } from '@heroicons/react/outline';
@@ -54,11 +55,6 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
   const getFilenameFromUrl = (url: string) => {
     const parts = url.split('/');
     return parts[parts.length - 1];
-  };
-
-  const handleSomeAction = () => {
-    // Add your logic here
-    console.log('Action performed');
   };
 
   if (!selectedChatroom) {
@@ -181,14 +177,15 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
                   <XIcon className="w-5 h-5" />
                 </motion.button>
               </div>
-              <motion.img
-                src={expandedImage}
-                alt="Expanded view"
-                className="max-w-full max-h-[85vh] object-contain rounded shadow-lg"
-                drag
-                dragConstraints={{ left: -100, right: 100, top: -100, bottom: 100 }}
-                dragElastic={0.1}
-              />
+              <div className="relative w-[85vw] h-[85vh] max-w-4xl">
+                <Image
+                  src={expandedImage || ''}
+                  alt="Expanded view"
+                  fill
+                  className="object-contain rounded shadow-lg"
+                  sizes="(max-width: 1024px) 85vw, 1024px"
+                />
+              </div>
             </motion.div>
           </motion.div>
         )}
@@ -247,12 +244,16 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
                   >
                     {message.message_type.includes('picture') ? (
                       <>
-                        <img
-                          src={message.media_url}
-                          alt="Shared image"
-                          className="max-w-xs rounded cursor-pointer transform transition-transform hover:scale-105"
-                          onClick={() => message.media_url && setExpandedImage(message.media_url)}
-                        />
+                        <div className="relative w-full max-w-xs">
+                          <Image
+                            src={message.media_url || ''}
+                            alt="Shared image"
+                            width={250}
+                            height={200}
+                            className="rounded cursor-pointer transform transition-transform hover:scale-105 object-cover"
+                            onClick={() => message.media_url && setExpandedImage(message.media_url)}
+                          />
+                        </div>
                         <div className="absolute bottom-2 right-2 opacity-80 hover:opacity-100 transition-opacity duration-200">
                           <motion.button
                             className="p-1.5 bg-white rounded-full text-gray-800 shadow-md"
@@ -271,17 +272,21 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
                         <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
                           <div className="bg-black bg-opacity-50 w-full h-full flex items-center justify-center">
                             <div className="flex space-x-3">
-                              <motion.button
-                                className="p-2 bg-white rounded-full text-gray-800"
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.9 }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  message.media_url && setExpandedImage(message.media_url);
-                                }}
-                              >
-                                <MaximizeIcon className="h-5 w-5" />
-                              </motion.button>
+                              {message.media_url && (
+                                <motion.button
+                                  className="p-2 bg-white rounded-full text-gray-800"
+                                  whileHover={{ scale: 1.1 }}
+                                  whileTap={{ scale: 0.9 }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (message.media_url) {
+                                      setExpandedImage(message.media_url);
+                                    }
+                                  }}
+                                >
+                                  <MaximizeIcon className="h-5 w-5" />
+                                </motion.button>
+                              )}
                             </div>
                           </div>
                         </div>

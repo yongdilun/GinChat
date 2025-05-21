@@ -85,7 +85,7 @@ const ApiErrorBoundary = ({ children }: ApiErrorBoundaryProps) => {
               <div>
                 <p>{apiError}</p>
                 <p className="text-xs mt-1">
-                  If you're a developer, make sure the Go backend server is running at http://localhost:8080
+                  If you&apos;re a developer, make sure the Go backend server is running at http://localhost:8080
                   <br />
                   Run <code className="bg-gray-100 px-1 rounded">cd backend && go run main.go</code> to start the server.
                 </p>
