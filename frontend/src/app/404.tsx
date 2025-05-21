@@ -27,7 +27,7 @@ export default function NotFound() {
           </>
         ) : (
           <>
-            <p className="text-gray-600 mb-6">The page you're looking for doesn't exist or has been moved.</p>
+            <p className="text-gray-600 mb-6">The page you&apos;re looking for doesn&apos;t exist or has been moved.</p>
             <Link href="/" className="bg-primary-500 hover:bg-primary-600 text-white px-4 py-2 rounded transition-colors inline-block">
               Go to Home
             </Link>
