@@ -22,6 +22,7 @@ export default function ChatPage() {
   const [wsUrl, setWsUrl] = useState<string>('');
   // Track processed message IDs to prevent duplication
   const processedMessageIdsRef = useRef<Set<string>>(new Set());
+  const [hasFetchedData, setHasFetchedData] = useState(false);
 
   // Add a message to the chat if it hasn't been added already
   const addMessageSafely = useCallback((newMessage: Message) => {
@@ -113,6 +114,11 @@ export default function ChatPage() {
 
   // Fetch chatrooms
   const fetchChatrooms = useCallback(async () => {
+    // Skip if we've already fetched data once
+    if (hasFetchedData) {
+      return;
+    }
+    
     setIsLoading(true);
     try {
       const response = await chatroomAPI.getChatrooms();
@@ -130,16 +136,27 @@ export default function ChatPage() {
           fetchMessages(joinedChatroom.id);
         }
       }
+      
+      // Mark that we've fetched data
+      setHasFetchedData(true);
     } catch (err: unknown) {
       const error = err as { response?: { data?: { error?: string } } };
       console.error('Error fetching chatrooms:', error.response?.data?.error || 'An error occurred');
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user, hasFetchedData]);
 
+  // Update the fetch messages function to use a similar flag
+  const fetchMessagesRef = useRef<{[chatroomId: string]: boolean}>({});
+  
   // Fetch messages for a chatroom
   const fetchMessages = async (chatroomId: string) => {
+    // Skip if we've already fetched messages for this chatroom
+    if (fetchMessagesRef.current[chatroomId]) {
+      return;
+    }
+    
     try {
       const response = await messageAPI.getMessages(chatroomId);
       // Reverse the messages to display oldest first (chronological order)
@@ -151,6 +168,9 @@ export default function ChatPage() {
       messagesData.forEach((msg: Message) => {
         processedMessageIdsRef.current.add(msg.id);
       });
+      
+      // Mark this chatroom's messages as fetched
+      fetchMessagesRef.current[chatroomId] = true;
     } catch (err: unknown) {
       const error = err as { response?: { data?: { error?: string } } };
       console.error('Error fetching messages:', error.response?.data?.error || 'An error occurred');
@@ -178,9 +198,24 @@ export default function ChatPage() {
 
   // Handle chatroom selection
   const handleSelectChatroom = (chatroom: Chatroom) => {
+    if (selectedChatroom?.id === chatroom.id) {
+      return; // Skip if same chatroom is selected
+    }
+    
     setSelectedChatroom(chatroom);
+    
+    // Allow fetching messages for this chatroom again if manually selected
+    fetchMessagesRef.current[chatroom.id] = false;
     fetchMessages(chatroom.id);
   };
+
+  // Add a manual refresh function that allows explicit refresh
+  const handleManualRefresh = useCallback(() => {
+    // Reset fetch flags to allow fetching again
+    setHasFetchedData(false);
+    fetchMessagesRef.current = {};
+    fetchChatrooms();
+  }, [fetchChatrooms]);
 
   if (isLoading) {
     return (
@@ -204,7 +239,7 @@ export default function ChatPage() {
           chatrooms={chatrooms}
           selectedChatroom={selectedChatroom}
           onSelectChatroom={handleSelectChatroom}
-          onChatroomsRefresh={fetchChatrooms}
+          onChatroomsRefresh={handleManualRefresh}
         />
 
         {/* Chat area */}
