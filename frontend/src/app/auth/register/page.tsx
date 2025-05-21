@@ -3,8 +3,13 @@
 import Layout from '@/components/Layout';
 import RegisterForm from '@/components/auth/RegisterForm';
 
-// Force Next.js to render this page dynamically at request time
+// Force this page to be dynamically rendered
 export const dynamic = 'force-dynamic';
+
+// Skip static generation during build
+export async function generateStaticParams() {
+  return [];
+}
 
 export default function RegisterPage() {
   return (
