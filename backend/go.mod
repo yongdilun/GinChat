@@ -1,6 +1,6 @@
 module github.com/ginchat
 
-go 1.24.2
+go 1.24.0
 
 require (
 	github.com/cloudinary/cloudinary-go/v2 v2.10.0
