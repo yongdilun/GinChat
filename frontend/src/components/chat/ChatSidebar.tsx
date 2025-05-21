@@ -124,7 +124,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
     setError('');
 
     try {
-      const joinResponse = await chatroomAPI.joinChatroom(chatroomId);
+      await chatroomAPI.joinChatroom(chatroomId);
 
       // Hide forms
       setShowJoinChatroom(false);

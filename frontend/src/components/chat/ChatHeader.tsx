@@ -18,7 +18,6 @@ const MicrophoneIcon = ({ className }: { className?: string }) => (
 
 interface ChatHeaderProps {
   chatroom: Chatroom | null;
-  onClose: () => void;
 }
 
 interface File {
@@ -44,7 +43,7 @@ function DownloadIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
-export default function ChatHeader({ chatroom, onClose }: ChatHeaderProps) {
+export default function ChatHeader({ chatroom }: ChatHeaderProps) {
   const [activeTab, setActiveTab] = useState<'members' | 'images' | 'videos' | 'audio'>('members');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showContent, setShowContent] = useState(false);
@@ -256,10 +255,12 @@ export default function ChatHeader({ chatroom, onClose }: ChatHeaderProps) {
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
           <div className="relative w-full max-w-4xl">
             <div className="relative w-full" style={{ maxHeight: "calc(100vh - 6rem)", height: "auto" }}>
-              <img 
+              <Image 
                 src={selectedImage} 
                 alt="Selected image" 
-                className="mx-auto max-h-[80vh] max-w-full object-contain" 
+                className="mx-auto max-h-[80vh] max-w-full object-contain"
+                fill
+                sizes="(max-width: 1024px) 100vw, 1024px"
               />
             </div>
             <div className="absolute top-4 right-4 flex space-x-2">

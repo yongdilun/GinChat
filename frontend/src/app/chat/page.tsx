@@ -241,9 +241,8 @@ export default function ChatPage() {
 
   // Fetch chatrooms
   const fetchChatrooms = useCallback(async () => {
-    // Skip if we've already fetched data once
     if (hasFetchedData) {
-      return;
+      return; // Skip if already fetched
     }
     
     setIsLoading(true);
@@ -263,7 +262,7 @@ export default function ChatPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [user, hasFetchedData]);
+  }, [hasFetchedData]);
 
   // Update the fetch messages function to use a similar flag
   const fetchMessagesRef = useRef<{[chatroomId: string]: boolean}>({});
@@ -458,7 +457,6 @@ export default function ChatPage() {
               {/* Chat header - using enhancedSelectedChatroom with media */}
               <ChatHeader 
                 chatroom={enhancedSelectedChatroom} 
-                onClose={() => {}}
               />
 
               {/* Messages */}
