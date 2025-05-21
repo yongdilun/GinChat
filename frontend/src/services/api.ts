@@ -44,7 +44,14 @@ api.interceptors.response.use(
     
     // Handle 401 Unauthorized errors (token expired or invalid)
     if (error.response) {
-      if (error.response.status === 401 && window.location.pathname !== '/auth/login') {
+      // Only redirect to session expired if:
+      // 1. Status is 401 AND
+      // 2. We're not already on the login page AND
+      // 3. The request is not a login attempt
+      const isLoginAttempt = error.config?.url?.includes('/api/auth/login');
+      if (error.response.status === 401 && 
+          window.location.pathname !== '/auth/login' && 
+          !isLoginAttempt) {
         // Clear local storage and redirect to login
         localStorage.removeItem('token');
         localStorage.removeItem('user');

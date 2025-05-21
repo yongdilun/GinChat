@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import ChatLayout from '@/components/ChatLayout';
 import ChatSidebar from '@/components/chat/ChatSidebar';
@@ -10,6 +10,12 @@ import MessageInput from '@/components/chat/MessageInput';
 import { User, Chatroom, Message, WebSocketMessage } from '@/types';
 import { chatroomAPI, messageAPI } from '@/services/api';
 import useWebSocket from '@/hooks/useWebSocket';
+
+// Interface for media inside chatrooms
+interface Media {
+  url: string;
+  type: string; // "image", "video", or "audio"
+}
 
 // Welcome component for when no chatroom is selected
 const WelcomePage = ({ user, onCreateChatroom, onJoinChatroom }: { 
@@ -96,6 +102,43 @@ export default function ChatPage() {
   // Track processed message IDs to prevent duplication
   const processedMessageIdsRef = useRef<Set<string>>(new Set());
   const [hasFetchedData, setHasFetchedData] = useState(false);
+  // Store media for the chatroom
+  const [chatroomMedia, setChatroomMedia] = useState<Media[]>([]);
+
+  // Process messages to extract media (image, video, audio)
+  useEffect(() => {
+    if (!messages.length) {
+      setChatroomMedia([]);
+      return;
+    }
+
+    // Extract media from messages
+    const media: Media[] = [];
+    
+    // Process messages to extract media
+    messages.forEach(message => {
+      if (message.media_url) {
+        let type = 'image'; // Default type
+        
+        if (message.message_type.includes('video')) {
+          type = 'video';
+        } else if (message.message_type.includes('audio')) {
+          type = 'audio';
+        } else if (message.message_type.includes('picture')) {
+          type = 'image';
+        }
+        
+        media.push({
+          url: message.media_url,
+          type: type
+        });
+      }
+    });
+    
+    setChatroomMedia(media);
+    console.log(`Processed ${media.length} media files from messages`);
+    
+  }, [messages]);
 
   // Add a message to the chat if it hasn't been added already
   const addMessageSafely = useCallback((newMessage: Message) => {
@@ -132,6 +175,17 @@ export default function ChatPage() {
       console.error('Error parsing WebSocket message:', err);
     }
   }, [selectedChatroom, addMessageSafely]);
+
+  // Create enhanced chatroom with media
+  const enhancedSelectedChatroom = useMemo(() => {
+    if (!selectedChatroom) return null;
+    
+    return {
+      ...selectedChatroom,
+      media: chatroomMedia,
+      files: [] // Add files if needed later
+    };
+  }, [selectedChatroom, chatroomMedia]);
 
   // Get authentication token for WebSocket
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
@@ -394,9 +448,9 @@ export default function ChatPage() {
         <div className="flex-1 flex flex-col overflow-hidden">
           {selectedChatroom ? (
             <>
-              {/* Chat header */}
+              {/* Chat header - using enhancedSelectedChatroom with media */}
               <ChatHeader 
-                chatroom={selectedChatroom} 
+                chatroom={enhancedSelectedChatroom} 
                 onClose={() => {}}
               />
 
