@@ -328,12 +328,28 @@ export default function ChatPage() {
   };
 
   // Add a manual refresh function that allows explicit refresh
-  const handleManualRefresh = useCallback(() => {
+  const handleManualRefresh = useCallback(async () => {
     // Reset fetch flags to allow fetching again
     setHasFetchedData(false);
     fetchMessagesRef.current = {};
-    fetchChatrooms();
-  }, [fetchChatrooms]);
+    
+    try {
+      // Directly fetch chatrooms once instead of calling fetchChatrooms
+      // which will check hasFetchedData and potentially not fetch
+      setIsLoading(true);
+      const response = await chatroomAPI.getChatrooms();
+      const chatrooms = response.data.chatrooms || [];
+      setChatrooms(chatrooms);
+      
+      // Mark that we've fetched data
+      setHasFetchedData(true);
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { error?: string } } };
+      console.error('Error fetching chatrooms:', error.response?.data?.error || 'An error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   // Helper functions to handle creating/joining chatrooms from the welcome page
   const handleShowCreateChatroom = useCallback(() => {

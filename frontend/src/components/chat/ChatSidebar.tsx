@@ -94,24 +94,18 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
     try {
       const response = await chatroomAPI.createChatroom(newChatroomName);
 
-      // Get the newly created chatroom ID
-      const newChatroomId = response.data.chatroom.id;
+      // Get the newly created chatroom
+      const newChatroom = response.data.chatroom;
 
       // Clear input and hide forms
       setNewChatroomName('');
       setShowCreateChatroom(false);
       setShowChatroomOptions(false);
 
-      // Refresh chatrooms
+      // Refresh chatrooms via the parent component
       await onChatroomsRefresh();
 
-      // Find the newly created chatroom in the updated list
-      const updatedChatrooms = await chatroomAPI.getChatrooms();
-      const newChatroom = updatedChatrooms.data.chatrooms.find(
-        (chatroom: Chatroom) => chatroom.id === newChatroomId
-      );
-
-      // Select the newly created chatroom
+      // Select the newly created chatroom directly
       if (newChatroom) {
         console.log("Automatically selecting newly created chatroom:", newChatroom.name);
         onSelectChatroom(newChatroom);
@@ -130,20 +124,17 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
     setError('');
 
     try {
-      await chatroomAPI.joinChatroom(chatroomId);
+      const joinResponse = await chatroomAPI.joinChatroom(chatroomId);
 
       // Hide forms
       setShowJoinChatroom(false);
       setShowChatroomOptions(false);
 
-      // Refresh chatrooms
+      // Refresh chatrooms via the parent component
       await onChatroomsRefresh();
 
-      // Find the joined chatroom in the updated list
-      const updatedChatrooms = await chatroomAPI.getChatrooms();
-      const joinedChatroom = updatedChatrooms.data.chatrooms.find(
-        (chatroom: Chatroom) => chatroom.id === chatroomId
-      );
+      // Find the joined chatroom in the current chatrooms list or use the response
+      const joinedChatroom = chatrooms.find(chatroom => chatroom.id === chatroomId);
 
       // Select the joined chatroom
       if (joinedChatroom) {

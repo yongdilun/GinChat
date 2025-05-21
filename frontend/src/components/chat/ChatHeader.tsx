@@ -63,10 +63,15 @@ export default function ChatHeader({ chatroom, onClose }: ChatHeaderProps) {
     setSelectedImage(imageUrl);
   };
 
+  const getFilenameFromUrl = (url: string) => {
+    const parts = url.split('/');
+    return parts[parts.length - 1] || 'download';
+  };
+
   const handleDownload = (url: string) => {
     const link = document.createElement('a');
     link.href = url;
-    link.download = url.split('/').pop() || 'download';
+    link.download = getFilenameFromUrl(url);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -98,15 +103,6 @@ export default function ChatHeader({ chatroom, onClose }: ChatHeaderProps) {
             {chatroom.members?.length || 0} members
           </span>
         </div>
-        <button
-          onClick={(e) => {
-            e.stopPropagation(); // Prevent triggering parent onClick
-            onClose();
-          }}
-          className="p-2 text-gray-400 hover:text-gray-500 focus:outline-none"
-        >
-          <XIcon className="w-6 h-6" aria-hidden="true" />
-        </button>
       </div>
 
       {showContent && (
@@ -257,19 +253,18 @@ export default function ChatHeader({ chatroom, onClose }: ChatHeaderProps) {
       )}
 
       {selectedImage && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-          <div className="relative max-w-4xl max-h-[90vh]">
-            <div className="relative w-full h-[90vh]">
-              <Image
-                src={selectedImage}
-                alt="Selected image"
-                fill
-                className="object-contain"
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="relative w-full max-w-4xl">
+            <div className="relative w-full" style={{ maxHeight: "calc(100vh - 6rem)", height: "auto" }}>
+              <img 
+                src={selectedImage} 
+                alt="Selected image" 
+                className="mx-auto max-h-[80vh] max-w-full object-contain" 
               />
             </div>
             <div className="absolute top-4 right-4 flex space-x-2">
               <button
-                onClick={() => handleDownload(selectedImage)}
+                onClick={() => selectedImage && handleDownload(selectedImage)}
                 className="p-2 bg-black bg-opacity-50 rounded-full text-white hover:bg-opacity-75"
               >
                 <DownloadIcon className="w-6 h-6" aria-hidden="true" />
