@@ -66,7 +66,7 @@ export default function ChatPage() {
   // Update wsUrl when selectedChatroom changes
   useEffect(() => {
     if (token && selectedChatroom) {
-      const wsBaseUrl = process.env.NEXT_PUBLIC_API_URL?.replace('http', 'ws') || 'ws://localhost:8080';
+      const wsBaseUrl = process.env.NEXT_PUBLIC_WS_URL;
       setWsUrl(`${wsBaseUrl}/api/ws?token=${encodeURIComponent(token)}&room_id=${encodeURIComponent(selectedChatroom.id)}`);
       
       // Clear processed messages when changing rooms
@@ -86,6 +86,10 @@ export default function ChatPage() {
       },
       onClose: (event) => {
         console.log('WebSocket disconnected:', event);
+        // Attempt to reconnect if not a normal closure
+        if (event.code !== 1000 && event.code !== 1001) {
+          console.log('Attempting to reconnect...');
+        }
       },
       onError: (error) => {
         console.error('WebSocket error:', error);

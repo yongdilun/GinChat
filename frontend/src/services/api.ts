@@ -2,9 +2,10 @@ import axios from 'axios';
 
 // Create an axios instance
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
   headers: {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
   },
   // Set a timeout to avoid hanging requests
   timeout: 10000, // 10 seconds
@@ -41,7 +42,10 @@ api.interceptors.response.use(
     } else if (error.request) {
       // The request was made but no response was received
       console.error('Network error:', error.request);
-      // We'll handle this in the components
+      // Show a user-friendly error message
+      if (window.location.pathname !== '/auth/login') {
+        alert('Unable to connect to the server. Please check your internet connection and try again.');
+      }
     } else {
       // Something happened in setting up the request that triggered an Error
       console.error('Error:', error.message);
