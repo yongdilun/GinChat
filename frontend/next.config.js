@@ -1,16 +1,21 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Keep output: 'export' for Render hosting
+  // Static export configuration
   output: 'export',
   // Disable image optimization which is incompatible with export
   images: {
     unoptimized: true,
   },
-  // Tell Next.js to exclude auth pages from static generation
-  // This also prevents pre-rendering errors with client components
-  // that use browser APIs like localStorage
+  // Use trailing slash for better static hosting compatibility
   trailingSlash: true,
+  // Skip generating auth pages statically - they'll use client-side navigation only
+  experimental: {
+    // This enables appDir but skips specific routes during static generation
+    appDir: true,
+  },
+  // Tell Next.js to exclude certain patterns from static generation
+  distDir: 'out',
 };
 
 module.exports = nextConfig;

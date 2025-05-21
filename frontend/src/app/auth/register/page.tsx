@@ -6,11 +6,6 @@ import RegisterForm from '@/components/auth/RegisterForm';
 // Force this page to be dynamically rendered
 export const dynamic = 'force-dynamic';
 
-// Skip static generation during build
-export async function generateStaticParams() {
-  return [];
-}
-
 export default function RegisterPage() {
   return (
     <Layout>
