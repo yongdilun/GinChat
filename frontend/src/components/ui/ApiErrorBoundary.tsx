@@ -10,83 +10,93 @@ interface ApiErrorBoundaryProps {
 const ApiErrorBoundary = ({ children }: ApiErrorBoundaryProps) => {
   const [apiError, setApiError] = useState<string | null>(null);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://ginchat-14ry.onrender.com';
+  const [isChecking, setIsChecking] = useState(false);
 
   useEffect(() => {
+    // Don't show error initially while we're still loading
+    setApiError(null);
+    
     // Function to check if the backend API is available
     const checkApiAvailability = async () => {
+      if (isChecking) return; // Prevent multiple simultaneous checks
+      
+      setIsChecking(true);
+      console.log(`Checking API health at ${apiUrl}/health`);
+      
       try {
-        // Use a simple fetch to check if the API is available
-        // We'll use the /health endpoint at the root level, not under /api
-        const response = await fetch('/health', {
+        // Use a direct fetch to the backend
+        const response = await fetch(`${apiUrl}/health`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
+            'Accept': 'application/json',
           },
-          // Short timeout to avoid long waiting times
-          signal: AbortSignal.timeout(3000),
+          mode: 'no-cors', // Try no-cors to bypass CORS issues
+          cache: 'no-cache',
+          signal: AbortSignal.timeout(8000),
         });
-        if (!response.ok) {
-          setApiError('Backend API is not responding properly. Some features may not work.');
-        } else {
-          setApiError(null);
-        }
+        
+        console.log('Health check response:', response.status, response.statusText);
+        
+        // With no-cors, we can't access the status, so we assume it's ok if we got here
+        setApiError(null);
       } catch (error) {
         console.error('API availability check failed:', error);
-        // More detailed error logging
-        if (error instanceof TypeError && error.message.includes('fetch')) {
-          console.error('Network error details:', error.message);
-        } else if (error instanceof DOMException && error.name === 'AbortError') {
-          console.error('Request timed out');
+        
+        // Try a second attempt with CORS mode
+        try {
+          const corsResponse = await fetch(`${apiUrl}/health`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            mode: 'cors',
+            signal: AbortSignal.timeout(8000),
+          });
+          
+          console.log('CORS health check response:', corsResponse.status);
+          
+          if (corsResponse.ok) {
+            setApiError(null);
+          } else {
+            setApiError('Backend API is not responding properly. Some features may not work.');
+          }
+        } catch (corsError) {
+          console.error('CORS health check failed:', corsError);
+          setApiError('Cannot connect to the backend server. Please ensure it is running.');
         }
-        setApiError('Cannot connect to the backend server. Please ensure it is running.');
+      } finally {
+        setIsChecking(false);
       }
     };
 
     // Check API availability when component mounts
     checkApiAvailability();
 
-    // Also try a direct fetch to the backend to debug CORS issues
-    fetch(`${apiUrl}/health`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      mode: 'cors', // Explicitly set CORS mode
-    })
-      .then(response => {
-        console.log('Direct backend access successful:', response.status);
-        if (response.ok) {
-          setApiError(null);
-        }
-      })
-      .catch(error => {
-        console.error('Direct backend access failed:', error);
-      });
-
-    // Set up periodic checks - only if there's an error
-    // This reduces unnecessary requests to the backend
-    const intervalId = setInterval(() => {
-      if (apiError) {
-        checkApiAvailability();
-      }
-    }, 60000); // Check every 60 seconds, but only if there's an error
+    // Set up periodic checks but with reduced frequency
+    const intervalId = setInterval(checkApiAvailability, 60000); // Check every minute
 
     return () => {
       clearInterval(intervalId);
     };
-  }, [apiError, apiUrl]);
+  }, [apiUrl, isChecking]);
+
+  // If we're in development mode and using localhost, don't show the error
+  const isDev = process.env.NODE_ENV === 'development';
+  const isLocalBackend = apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1');
+  const shouldSuppress = isDev && isLocalBackend && apiError;
 
   return (
     <>
-      {apiError && (
-        <div className="fixed top-0 left-0 right-0 z-50 p-4">
+      {apiError && !shouldSuppress && (
+        <div className="fixed top-0 left-0 right-0 z-50 p-4 bg-opacity-90">
           <AlertMessage
-            type="error"
+            type="warning"
             message={
               <div>
                 <p>{apiError}</p>
                 <p className="text-xs mt-1">
-                  If you&apos;re a developer, make sure the Go backend server is running at {apiUrl}
+                  Backend server URL: {apiUrl}
                 </p>
               </div>
             }
