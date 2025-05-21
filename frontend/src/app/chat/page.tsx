@@ -11,6 +11,79 @@ import { User, Chatroom, Message, WebSocketMessage } from '@/types';
 import { chatroomAPI, messageAPI } from '@/services/api';
 import useWebSocket from '@/hooks/useWebSocket';
 
+// Welcome component for when no chatroom is selected
+const WelcomePage = ({ user, onCreateChatroom, onJoinChatroom }: { 
+  user: User | null;
+  onCreateChatroom: () => void;
+  onJoinChatroom: () => void;
+}) => {
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900">
+        <div className="text-center max-w-xl">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-r from-primary-500 to-primary-600 flex items-center justify-center text-white text-2xl font-bold shadow-lg">
+            {user?.username?.charAt(0).toUpperCase() || 'G'}
+          </div>
+          
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">
+            Welcome to GinChat, {user?.username || 'User'}!
+          </h1>
+          
+          <p className="text-gray-600 dark:text-gray-300 mb-8">
+            Connect with others by joining an existing chatroom or create your own to start chatting.
+          </p>
+          
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <button
+              onClick={onCreateChatroom}
+              className="px-6 py-3 bg-primary-500 text-white font-medium rounded-lg shadow-md hover:bg-primary-600 transition-colors flex items-center justify-center"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Create a Chatroom
+            </button>
+            
+            <button
+              onClick={onJoinChatroom}
+              className="px-6 py-3 bg-green-500 text-white font-medium rounded-lg shadow-md hover:bg-green-600 transition-colors flex items-center justify-center"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              Join a Chatroom
+            </button>
+          </div>
+          
+          <div className="mt-12 px-6 py-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">Getting Started</h2>
+            <ul className="space-y-2 text-left text-sm text-gray-600 dark:text-gray-300">
+              <li className="flex items-start">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Join existing chatrooms using the sidebar
+              </li>
+              <li className="flex items-start">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Create your own chatrooms and invite others
+              </li>
+              <li className="flex items-start">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Share messages, images and files in real-time
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function ChatPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -217,6 +290,81 @@ export default function ChatPage() {
     fetchChatrooms();
   }, [fetchChatrooms]);
 
+  // Helper functions to handle creating/joining chatrooms from the welcome page
+  const handleShowCreateChatroom = useCallback(() => {
+    // Find sidebar and check if it's collapsed
+    const sidebarElement = document.querySelector('[data-sidebar]');
+    if (!sidebarElement) return;
+    
+    const isCollapsed = sidebarElement.classList.contains('w-20');
+    
+    if (isCollapsed) {
+      // Expand sidebar first
+      const expandButton = sidebarElement.querySelector('button[title="Expand sidebar"]') as HTMLButtonElement;
+      expandButton?.click();
+      
+      // Wait for animation to complete then show create form
+      setTimeout(() => {
+        // Click add button
+        const addButton = document.getElementById('add-chatroom-button') as HTMLButtonElement;
+        if (addButton) addButton.click();
+        
+        // After options panel opens, click create button
+        setTimeout(() => {
+          const createButton = document.getElementById('create-chatroom-button') as HTMLButtonElement;
+          if (createButton) createButton.click();
+        }, 100);
+      }, 300);
+    } else {
+      // Not collapsed, show create directly
+      // First make sure options are shown
+      const addButton = document.getElementById('add-chatroom-button') as HTMLButtonElement;
+      if (addButton) addButton.click();
+      
+      setTimeout(() => {
+        const createButton = document.getElementById('create-chatroom-button') as HTMLButtonElement;
+        if (createButton) createButton.click();
+      }, 100);
+    }
+  }, []);
+  
+  const handleShowJoinChatroom = useCallback(() => {
+    // Find sidebar and check if it's collapsed
+    const sidebarElement = document.querySelector('[data-sidebar]');
+    if (!sidebarElement) return;
+    
+    const isCollapsed = sidebarElement.classList.contains('w-20');
+    
+    if (isCollapsed) {
+      // Expand sidebar first
+      const expandButton = sidebarElement.querySelector('button[title="Expand sidebar"]') as HTMLButtonElement;
+      expandButton?.click();
+      
+      // Wait for animation to complete then show join form
+      setTimeout(() => {
+        // Click add button
+        const addButton = document.getElementById('add-chatroom-button') as HTMLButtonElement;
+        if (addButton) addButton.click();
+        
+        // After options panel opens, click join button
+        setTimeout(() => {
+          const joinButton = document.getElementById('join-chatroom-button') as HTMLButtonElement;
+          if (joinButton) joinButton.click();
+        }, 100);
+      }, 300);
+    } else {
+      // Not collapsed, show join directly
+      // First make sure options are shown
+      const addButton = document.getElementById('add-chatroom-button') as HTMLButtonElement;
+      if (addButton) addButton.click();
+      
+      setTimeout(() => {
+        const joinButton = document.getElementById('join-chatroom-button') as HTMLButtonElement;
+        if (joinButton) joinButton.click();
+      }, 100);
+    }
+  }, []);
+
   if (isLoading) {
     return (
       <ChatLayout>
@@ -244,104 +392,44 @@ export default function ChatPage() {
 
         {/* Chat area */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Chat header */}
-          <ChatHeader 
-            chatroom={selectedChatroom} 
-            onClose={() => {}}
-          />
+          {selectedChatroom ? (
+            <>
+              {/* Chat header */}
+              <ChatHeader 
+                chatroom={selectedChatroom} 
+                onClose={() => {}}
+              />
 
-          {/* Messages */}
-          <div className="flex-1 overflow-hidden">
-            <MessageList
+              {/* Messages */}
+              <div className="flex-1 overflow-hidden">
+                <MessageList
+                  user={user}
+                  selectedChatroom={selectedChatroom}
+                  messages={messages}
+                  onShowJoinChatroom={handleShowJoinChatroom}
+                  onShowCreateChatroom={handleShowCreateChatroom}
+                />
+              </div>
+
+              {/* Message input */}
+              <MessageInput
+                selectedChatroom={selectedChatroom}
+                onMessageSent={(sentMessage) => {
+                  // If we got a sent message, add it to the messages list using
+                  // our safe add function that prevents duplication
+                  if (sentMessage) {
+                    addMessageSafely(sentMessage);
+                  }
+                }}
+              />
+            </>
+          ) : (
+            <WelcomePage 
               user={user}
-              selectedChatroom={selectedChatroom}
-              messages={messages}
-              onShowJoinChatroom={() => {
-                // Find sidebar and check if it's collapsed
-                const sidebarElement = document.querySelector('[data-sidebar]');
-                if (!sidebarElement) return;
-                
-                const isCollapsed = sidebarElement.classList.contains('w-20');
-                
-                if (isCollapsed) {
-                  // Expand sidebar first
-                  const expandButton = sidebarElement.querySelector('button[title="Expand sidebar"]') as HTMLButtonElement;
-                  expandButton?.click();
-                  
-                  // Wait for animation to complete then show join form
-                  setTimeout(() => {
-                    // Click add button
-                    const addButton = document.getElementById('add-chatroom-button') as HTMLButtonElement;
-                    if (addButton) addButton.click();
-                    
-                    // After options panel opens, click join button
-                    setTimeout(() => {
-                      const joinButton = document.getElementById('join-chatroom-button') as HTMLButtonElement;
-                      if (joinButton) joinButton.click();
-                    }, 100);
-                  }, 300);
-                } else {
-                  // Not collapsed, show join directly
-                  // First make sure options are shown
-                  const addButton = document.getElementById('add-chatroom-button') as HTMLButtonElement;
-                  if (addButton) addButton.click();
-                  
-                  setTimeout(() => {
-                    const joinButton = document.getElementById('join-chatroom-button') as HTMLButtonElement;
-                    if (joinButton) joinButton.click();
-                  }, 100);
-                }
-              }}
-              onShowCreateChatroom={() => {
-                // Find sidebar and check if it's collapsed
-                const sidebarElement = document.querySelector('[data-sidebar]');
-                if (!sidebarElement) return;
-                
-                const isCollapsed = sidebarElement.classList.contains('w-20');
-                
-                if (isCollapsed) {
-                  // Expand sidebar first
-                  const expandButton = sidebarElement.querySelector('button[title="Expand sidebar"]') as HTMLButtonElement;
-                  expandButton?.click();
-                  
-                  // Wait for animation to complete then show create form
-                  setTimeout(() => {
-                    // Click add button
-                    const addButton = document.getElementById('add-chatroom-button') as HTMLButtonElement;
-                    if (addButton) addButton.click();
-                    
-                    // After options panel opens, click create button
-                    setTimeout(() => {
-                      const createButton = document.getElementById('create-chatroom-button') as HTMLButtonElement;
-                      if (createButton) createButton.click();
-                    }, 100);
-                  }, 300);
-                } else {
-                  // Not collapsed, show create directly
-                  // First make sure options are shown
-                  const addButton = document.getElementById('add-chatroom-button') as HTMLButtonElement;
-                  if (addButton) addButton.click();
-                  
-                  setTimeout(() => {
-                    const createButton = document.getElementById('create-chatroom-button') as HTMLButtonElement;
-                    if (createButton) createButton.click();
-                  }, 100);
-                }
-              }}
+              onCreateChatroom={handleShowCreateChatroom}
+              onJoinChatroom={handleShowJoinChatroom}
             />
-          </div>
-
-          {/* Message input */}
-          <MessageInput
-            selectedChatroom={selectedChatroom}
-            onMessageSent={(sentMessage) => {
-              // If we got a sent message, add it to the messages list using
-              // our safe add function that prevents duplication
-              if (sentMessage) {
-                addMessageSafely(sentMessage);
-              }
-            }}
-          />
+          )}
         </div>
       </div>
     </ChatLayout>

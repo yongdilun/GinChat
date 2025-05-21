@@ -113,6 +113,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
 
       // Select the newly created chatroom
       if (newChatroom) {
+        console.log("Automatically selecting newly created chatroom:", newChatroom.name);
         onSelectChatroom(newChatroom);
       }
     } catch (err: unknown) {
@@ -146,6 +147,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
 
       // Select the joined chatroom
       if (joinedChatroom) {
+        console.log("Automatically selecting joined chatroom:", joinedChatroom.name);
         onSelectChatroom(joinedChatroom);
       }
     } catch (err: unknown) {
