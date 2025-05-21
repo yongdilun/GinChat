@@ -1,8 +1,13 @@
+'use client';
+
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { authAPI } from '@/services/api';
 import { User } from '@/types';
+
+// Check if we're in a browser environment
+const isBrowser = typeof window !== 'undefined';
 
 interface LoginFormProps {
   onSuccess?: (user: User) => void;
@@ -24,9 +29,11 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
       const response = await authAPI.login(email, password);
       const { token, user } = response.data;
 
-      // Store token and user data
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
+      // Store token and user data only in browser
+      if (isBrowser) {
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+      }
 
       // Call onSuccess callback if provided
       if (onSuccess) {

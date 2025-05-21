@@ -1,4 +1,9 @@
+'use client';
+
 import axios from 'axios';
+
+// Helper to check if we're in a browser environment
+const isBrowser = typeof window !== 'undefined';
 
 // Create an axios instance
 const api = axios.create({
@@ -14,9 +19,11 @@ const api = axios.create({
 // Add a request interceptor to add the auth token to every request
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (isBrowser) {
+      const token = localStorage.getItem('token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
     return config;
   },
@@ -31,6 +38,10 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
+    if (!isBrowser) {
+      return Promise.reject(error);
+    }
+    
     // Handle 401 Unauthorized errors (token expired or invalid)
     if (error.response) {
       if (error.response.status === 401 && window.location.pathname !== '/auth/login') {
@@ -65,17 +76,23 @@ export const authAPI = {
   logout: async () => {
     try {
       const response = await api.post('/auth/logout');
-      // Clear local storage
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      // Redirect to login with logout parameter
-      window.location.href = '/auth/login?session=logout';
+      
+      if (isBrowser) {
+        // Clear local storage
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        // Redirect to login with logout parameter
+        window.location.href = '/auth/login?session=logout';
+      }
+      
       return response;
     } catch (error) {
-      // Still clear storage and redirect even if the API call fails
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/auth/login?session=logout';
+      if (isBrowser) {
+        // Still clear storage and redirect even if the API call fails
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/auth/login?session=logout';
+      }
       throw error;
     }
   },

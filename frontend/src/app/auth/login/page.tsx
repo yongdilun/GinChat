@@ -6,6 +6,9 @@ import Layout from '@/components/Layout';
 import LoginForm from '@/components/auth/LoginForm';
 import AlertMessage from '@/components/ui/AlertMessage';
 
+// Force Next.js to render this page dynamically at request time
+export const dynamic = 'force-dynamic';
+
 export default function LoginPage() {
   const searchParams = useSearchParams();
   const [sessionAlert, setSessionAlert] = useState<{ type: 'warning' | 'info', message: string } | null>(null);
