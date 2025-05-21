@@ -21,6 +21,7 @@ export const useWebSocket = (url: string, options: WebSocketOptions = {}) => {
   const [lastMessage, setLastMessage] = useState<WebSocketData | null>(null);
   const urlRef = useRef<string>(url);
   const messageHandlerRef = useRef<((data: WebSocketData) => void) | null>(null);
+  const hasConnectedRef = useRef<boolean>(false);
 
   const {
     onOpen,
@@ -45,8 +46,16 @@ export const useWebSocket = (url: string, options: WebSocketOptions = {}) => {
       return;
     }
 
+    // If we've already attempted to connect once, don't try again
+    if (hasConnectedRef.current) {
+      return;
+    }
+
     // Update URL ref
     urlRef.current = url;
+    
+    // Mark that we've tried to connect
+    hasConnectedRef.current = true;
 
     // Check if already connected
     if (webSocketManager.isConnected(url)) {
@@ -98,6 +107,8 @@ export const useWebSocket = (url: string, options: WebSocketOptions = {}) => {
     if (urlRef.current) {
       webSocketManager.disconnect(urlRef.current);
       setIsConnected(false);
+      // Reset connection flag to allow connecting again if needed
+      hasConnectedRef.current = false;
     }
     cleanup();
   }, [cleanup]);
@@ -113,8 +124,10 @@ export const useWebSocket = (url: string, options: WebSocketOptions = {}) => {
     // Cleanup previous connection if URL changed
     cleanup();
     
-    // Connect to new URL
+    // Connect to new URL if it's not empty
     if (url) {
+      // Reset flag when URL changes
+      hasConnectedRef.current = false;
       connect();
     }
     
@@ -124,8 +137,8 @@ export const useWebSocket = (url: string, options: WebSocketOptions = {}) => {
     };
   }, [url, connect, cleanup]);
 
-  // Update connection status periodically
-  useEffect(() => {
+  // Remove periodic connection status check to reduce backend calls
+  /* useEffect(() => {
     const checkConnection = () => {
       if (urlRef.current) {
         const connected = webSocketManager.isConnected(urlRef.current);
@@ -135,7 +148,7 @@ export const useWebSocket = (url: string, options: WebSocketOptions = {}) => {
 
     const interval = setInterval(checkConnection, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, []); */
 
   return {
     isConnected,

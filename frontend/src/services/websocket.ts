@@ -116,18 +116,9 @@ class WebSocketManager {
         if (options?.onClose) {
           options.onClose(event);
         }
-
-        // Only attempt reconnect if not normal closure and within attempt limits
-        if (event.code !== 1000 && event.code !== 1001) {
-          const attempts = this.connectionAttempts.get(url) || 0;
-          if (attempts < this.maxReconnectAttempts) {
-            console.log(`Scheduling reconnect to ${url} in 3 seconds`);
-            const timer = setTimeout(() => {
-              this.connect(url, options);
-            }, 3000);
-            this.reconnectTimers.set(url, timer);
-          }
-        }
+        
+        // Automatic reconnection is disabled to prevent excessive health checks
+        // This helps reduce unnecessary backend API calls
       };
 
       ws.onerror = (error) => {
