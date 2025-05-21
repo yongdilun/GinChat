@@ -9,12 +9,7 @@ const nextConfig = {
   },
   // Use trailing slash for better static hosting compatibility
   trailingSlash: true,
-  // Skip generating auth pages statically - they'll use client-side navigation only
-  experimental: {
-    // This enables appDir but skips specific routes during static generation
-    appDir: true,
-  },
-  // Tell Next.js to exclude certain patterns from static generation
+  // Tell Next.js to output to the 'out' directory
   distDir: 'out',
 };
 

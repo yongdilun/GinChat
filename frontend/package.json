@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 next build",
-    "start": "npx serve out -p $PORT",
+    "build": "next build",
+    "start": "npx serve out -p ${PORT:-3000}",
     "lint": "next lint",
     "check:ts": "tsc --noEmit",
     "check:css": "stylelint \"**/*.css\"",

@@ -2,8 +2,9 @@ services:
   - type: web
     name: ginchat-frontend
     env: node
-    buildCommand: npm ci && npm run build:static
+    buildCommand: npm ci && npm run build
     startCommand: npm run start
+    publishDir: out
     envVars:
       - key: NODE_ENV
         value: production
