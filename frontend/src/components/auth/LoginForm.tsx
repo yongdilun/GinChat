@@ -1,193 +1,123 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useForm } from 'react-hook-form';
 import { authAPI } from '@/services/api';
-import AlertMessage from '@/components/ui/AlertMessage';
+import { User } from '@/types';
 
-type LoginFormData = {
-  email: string;
-  password: string;
-};
+interface LoginFormProps {
+  onSuccess?: (user: User) => void;
+}
 
-type AlertState = {
-  type: 'success' | 'error' | 'warning' | 'info';
-  message: string;
-};
-
-const LoginForm = () => {
+export default function LoginForm({ onSuccess }: LoginFormProps) {
   const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [alert, setAlert] = useState<AlertState | null>(null);
-  const [loginAttempts, setLoginAttempts] = useState(0);
+  const [error, setError] = useState('');
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset,
-  } = useForm<LoginFormData>();
-
-  // Clear alert after 5 seconds
-  useEffect(() => {
-    if (alert) {
-      const timer = setTimeout(() => {
-        setAlert(null);
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [alert]);
-
-  const onSubmit = async (data: LoginFormData) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setIsLoading(true);
-    setAlert(null);
+    setError('');
 
     try {
-      const response = await authAPI.login(data.email, data.password);
+      const response = await authAPI.login(email, password);
+      const { token, user } = response.data;
 
-      // Store token in localStorage
-      localStorage.setItem('token', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
+      // Store token and user data
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
 
-      // Show success message briefly before redirect
-      setAlert({
-        type: 'success',
-        message: 'Login successful! Redirecting to chat...'
-      });
-
-      // Redirect to chat page after a short delay
-      setTimeout(() => {
-        router.push('/chat');
-      }, 1000);
-    } catch (err: any) {
-      // Increment login attempts
-      setLoginAttempts(prev => prev + 1);
-
-      // Handle different error scenarios
-      if (err.response) {
-        if (err.response.status === 401) {
-          setAlert({
-            type: 'error',
-            message: 'Invalid email or password. Please try again.'
-          });
-        } else if (err.response.status === 429) {
-          setAlert({
-            type: 'warning',
-            message: 'Too many login attempts. Please try again later.'
-          });
-        } else {
-          setAlert({
-            type: 'error',
-            message: err.response.data?.error || 'An error occurred during login'
-          });
-        }
-      } else if (err.request) {
-        setAlert({
-          type: 'error',
-          message: 'Network error. Please check your connection and try again.'
-        });
-      } else {
-        setAlert({
-          type: 'error',
-          message: 'An unexpected error occurred. Please try again.'
-        });
+      // Call onSuccess callback if provided
+      if (onSuccess) {
+        onSuccess(user);
       }
 
-      // If too many failed attempts, show a helpful message
-      if (loginAttempts >= 2) {
-        setAlert({
-          type: 'info',
-          message: 'Having trouble logging in? You can reset your password or contact support.'
-        });
-      }
+      // Redirect to chat page
+      router.push('/chat');
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { error?: string } } };
+      setError(error.response?.data?.error || 'Failed to login');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="w-full max-w-md p-8 space-y-8 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-      <div className="text-center">
-        <h1 className="text-3xl font-bold">Login to GinChat</h1>
-        <p className="mt-2 text-gray-600 dark:text-gray-400">Enter your credentials to access your account</p>
-      </div>
-
-      {alert && (
-        <AlertMessage
-          type={alert.type}
-          message={alert.message}
-          onClose={() => setAlert(null)}
-        />
-      )}
-
-      <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            {...register('email', {
-              required: 'Email is required',
-              pattern: {
-                value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                message: 'Invalid email address',
-              }
-            })}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-          />
-          {errors.email && (
-            <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+            Sign in to your account
+          </h2>
+          <p className="mt-2 text-center text-sm text-gray-600">
+            Or{' '}
+            <Link href="/auth/register" className="font-medium text-primary-600 hover:text-primary-500">
+              create a new account
+            </Link>
+          </p>
+        </div>
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          <div className="rounded-md shadow-sm -space-y-px">
+            <div>
+              <label htmlFor="email-address" className="sr-only">
+                Email address
+              </label>
+              <input
+                id="email-address"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
+                placeholder="Email address"
+              />
+            </div>
+            <div>
+              <label htmlFor="password" className="sr-only">
+                Password
+              </label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
+                placeholder="Password"
+              />
+            </div>
+          </div>
+
+          {error && (
+            <div className="text-red-600 text-sm text-center">{error}</div>
           )}
-        </div>
 
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            {...register('password', { required: 'Password is required' })}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-          />
-          {errors.password && (
-            <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
-          )}
-        </div>
-
-        <div>
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 transition-all duration-200"
-          >
-            {isLoading ? (
-              <>
-                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Logging in...
-              </>
-            ) : (
-              'Login'
-            )}
-          </button>
-        </div>
-      </form>
-
-      <div className="text-center mt-4">
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          Don't have an account?{' '}
-          <Link href="/auth/register" className="font-medium text-primary-600 hover:text-primary-500">
-            Register
-          </Link>
-        </p>
+          <div>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
+            >
+              {isLoading ? (
+                <span className="flex items-center">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Signing in...
+                </span>
+              ) : (
+                'Sign in'
+              )}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
-};
-
-export default LoginForm;
+}

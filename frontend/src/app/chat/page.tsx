@@ -18,7 +18,6 @@ export default function ChatPage() {
   const [selectedChatroom, setSelectedChatroom] = useState<Chatroom | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
   const disconnectRef = useRef<(() => void) | null>(null);
   const [wsUrl, setWsUrl] = useState<string>('');
   // Track processed message IDs to prevent duplication
@@ -77,7 +76,7 @@ export default function ChatPage() {
   }, [token, selectedChatroom]);
 
   // Create WebSocket connection - always create the hook, even with empty URL
-  const { isConnected, disconnect } = useWebSocket(
+  const { disconnect } = useWebSocket(
     wsUrl,
     {
       onMessage: handleWebSocketMessage,
@@ -112,27 +111,8 @@ export default function ChatPage() {
     };
   }, [disconnect]); // Only depend on disconnect, not wsUrl
 
-  // Check if user is logged in
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('user');
-
-    if (!token || !userData) {
-      router.push('/auth/login');
-      return;
-    }
-
-    try {
-      setUser(JSON.parse(userData));
-      fetchChatrooms();
-    } catch (err) {
-      console.error('Failed to parse user data:', err);
-      router.push('/auth/login');
-    }
-  }, [router]);
-
   // Fetch chatrooms
-  const fetchChatrooms = async () => {
+  const fetchChatrooms = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await chatroomAPI.getChatrooms();
@@ -150,12 +130,13 @@ export default function ChatPage() {
           fetchMessages(joinedChatroom.id);
         }
       }
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'An error occurred');
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { error?: string } } };
+      console.error('Error fetching chatrooms:', error.response?.data?.error || 'An error occurred');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user]);
 
   // Fetch messages for a chatroom
   const fetchMessages = async (chatroomId: string) => {
@@ -170,10 +151,30 @@ export default function ChatPage() {
       messagesData.forEach((msg: Message) => {
         processedMessageIdsRef.current.add(msg.id);
       });
-    } catch (err: any) {
-      console.error('Error fetching messages:', err);
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { error?: string } } };
+      console.error('Error fetching messages:', error.response?.data?.error || 'An error occurred');
     }
   };
+
+  // Check if user is logged in
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const userData = localStorage.getItem('user');
+
+    if (!token || !userData) {
+      router.push('/auth/login');
+      return;
+    }
+
+    try {
+      setUser(JSON.parse(userData));
+      fetchChatrooms();
+    } catch (err) {
+      console.error('Failed to parse user data:', err);
+      router.push('/auth/login');
+    }
+  }, [router, fetchChatrooms]);
 
   // Handle chatroom selection
   const handleSelectChatroom = (chatroom: Chatroom) => {
@@ -210,8 +211,8 @@ export default function ChatPage() {
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Chat header */}
           <ChatHeader 
-            selectedChatroom={selectedChatroom} 
-            messages={messages}
+            chatroom={selectedChatroom} 
+            onClose={() => {}}
           />
 
           {/* Messages */}
