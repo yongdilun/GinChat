@@ -9,6 +9,7 @@ interface ApiErrorBoundaryProps {
 
 const ApiErrorBoundary = ({ children }: ApiErrorBoundaryProps) => {
   const [apiError, setApiError] = useState<string | null>(null);
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://ginchat-14ry.onrender.com';
 
   useEffect(() => {
     // Function to check if the backend API is available
@@ -45,7 +46,7 @@ const ApiErrorBoundary = ({ children }: ApiErrorBoundaryProps) => {
     checkApiAvailability();
 
     // Also try a direct fetch to the backend to debug CORS issues
-    fetch('http://localhost:8080/health', {
+    fetch(`${apiUrl}/health`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -73,7 +74,7 @@ const ApiErrorBoundary = ({ children }: ApiErrorBoundaryProps) => {
     return () => {
       clearInterval(intervalId);
     };
-  }, [apiError]);
+  }, [apiError, apiUrl]);
 
   return (
     <>
@@ -85,9 +86,7 @@ const ApiErrorBoundary = ({ children }: ApiErrorBoundaryProps) => {
               <div>
                 <p>{apiError}</p>
                 <p className="text-xs mt-1">
-                  If you&apos;re a developer, make sure the Go backend server is running at http://localhost:8080
-                  <br />
-                  Run <code className="bg-gray-100 px-1 rounded">cd backend && go run main.go</code> to start the server.
+                  If you&apos;re a developer, make sure the Go backend server is running at {apiUrl}
                 </p>
               </div>
             }
