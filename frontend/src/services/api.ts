@@ -68,14 +68,14 @@ api.interceptors.response.use(
 // Auth API
 export const authAPI = {
   login: (email: string, password: string) => {
-    return api.post('/auth/login', { email, password });
+    return api.post('/api/auth/login', { email, password });
   },
   register: (username: string, email: string, password: string) => {
-    return api.post('/auth/register', { username, email, password });
+    return api.post('/api/auth/register', { username, email, password });
   },
   logout: async () => {
     try {
-      const response = await api.post('/auth/logout');
+      const response = await api.post('/api/auth/logout');
       
       if (isBrowser) {
         // Clear local storage
@@ -101,26 +101,26 @@ export const authAPI = {
 // Chatroom API
 export const chatroomAPI = {
   getChatrooms: () => {
-    return api.get('/chatrooms');
+    return api.get('/api/chatrooms');
   },
   createChatroom: (name: string) => {
-    return api.post('/chatrooms', { name });
+    return api.post('/api/chatrooms', { name });
   },
   getChatroomById: (chatroomId: string) => {
-    return api.get(`/chatrooms/${chatroomId}`);
+    return api.get(`/api/chatrooms/${chatroomId}`);
   },
   joinChatroom: (chatroomId: string) => {
-    return api.post(`/chatrooms/${chatroomId}/join`);
+    return api.post(`/api/chatrooms/${chatroomId}/join`);
   },
 };
 
 // Message API
 export const messageAPI = {
   getMessages: (chatroomId: string) => {
-    return api.get(`/chatrooms/${chatroomId}/messages`);
+    return api.get(`/api/chatrooms/${chatroomId}/messages`);
   },
   sendMessage: (chatroomId: string, messageType: string, textContent?: string, mediaURL?: string) => {
-    return api.post(`/chatrooms/${chatroomId}/messages`, {
+    return api.post(`/api/chatrooms/${chatroomId}/messages`, {
       message_type: messageType,
       text_content: textContent,
       media_url: mediaURL,
@@ -132,7 +132,7 @@ export const messageAPI = {
     formData.append('file', file);
     formData.append('message_type', messageType);
 
-    return api.post('/media/upload', formData, {
+    return api.post('/api/media/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
