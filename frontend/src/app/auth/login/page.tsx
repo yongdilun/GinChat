@@ -13,14 +13,14 @@ export const dynamic = 'force-dynamic';
 function LoginPageLoading() {
   return (
     <Layout>
-      <div className="flex min-h-screen flex-col items-center justify-center p-24">
-        <div className="max-w-md w-full p-8 bg-white rounded-lg shadow-md">
+      <div className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-8 md:p-16 bg-gradient-to-b from-gray-900 to-gray-800">
+        <div className="max-w-md w-full p-8 bg-gray-800 rounded-lg shadow-md">
           <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-gray-200 rounded w-3/4 mx-auto"></div>
-            <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto"></div>
-            <div className="h-10 bg-gray-200 rounded"></div>
-            <div className="h-10 bg-gray-200 rounded"></div>
-            <div className="h-10 bg-gray-200 rounded w-full"></div>
+            <div className="h-8 bg-gray-700 rounded w-3/4 mx-auto"></div>
+            <div className="h-4 bg-gray-700 rounded w-1/2 mx-auto"></div>
+            <div className="h-10 bg-gray-700 rounded"></div>
+            <div className="h-10 bg-gray-700 rounded"></div>
+            <div className="h-10 bg-gray-700 rounded w-full"></div>
           </div>
         </div>
       </div>
@@ -51,7 +51,7 @@ function LoginPageContent() {
 
   return (
     <Layout>
-      <div className="flex min-h-screen flex-col items-center justify-center p-24">
+      <div className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-8 md:p-16 bg-gradient-to-b from-gray-900 to-gray-800">
         {sessionAlert && (
           <div className="w-full max-w-md mb-4">
             <AlertMessage

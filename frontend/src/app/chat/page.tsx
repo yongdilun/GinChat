@@ -252,17 +252,8 @@ export default function ChatPage() {
       const chatrooms = response.data.chatrooms || [];
       setChatrooms(chatrooms);
 
-      // Find the first chatroom that the user is a member of
-      if (chatrooms.length > 0 && user) {
-        const joinedChatroom = chatrooms.find((chatroom: Chatroom) =>
-          chatroom.members.some((member: { user_id: number }) => member.user_id === user.user_id)
-        );
-
-        if (joinedChatroom) {
-          setSelectedChatroom(joinedChatroom);
-          fetchMessages(joinedChatroom.id);
-        }
-      }
+      // Don't automatically select any chatroom on login
+      // Let the user choose which chatroom to enter
       
       // Mark that we've fetched data
       setHasFetchedData(true);
