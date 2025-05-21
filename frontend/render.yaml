@@ -1,19 +1,7 @@
+# render.yaml
 services:
-  - type: static_site
+  - type: web
     name: ginchat-frontend
+    runtime: static
     buildCommand: npm ci && npm run build
-    publishDir: out
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: NEXT_PUBLIC_API_URL
-        value: https://ginchat-14ry.onrender.com
-      - key: NEXT_PUBLIC_WS_URL
-        value: wss://ginchat-14ry.onrender.com
-    routes:
-      - type: rewrite
-        source: /api/*
-        destination: https://ginchat-14ry.onrender.com/api/$1
-      - type: rewrite
-        source: /health
-        destination: https://ginchat-14ry.onrender.com/health 
+    staticPublishPath: out 
