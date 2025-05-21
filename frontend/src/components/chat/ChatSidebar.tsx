@@ -20,13 +20,6 @@ const LogoutIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-// Replace SearchIcon with inline SVG
-const SearchIcon = ({ className }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-  </svg>
-);
-
 // Replace PlusIcon with inline SVG
 const PlusIcon = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -66,7 +59,6 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
   const [error, setError] = useState('');
   const [availableChatrooms, setAvailableChatrooms] = useState<Chatroom[]>([]);
   const [joinedChatrooms, setJoinedChatrooms] = useState<Chatroom[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   // Filter chatrooms to show only joined ones
@@ -84,12 +76,6 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
     setJoinedChatrooms(joined);
     setAvailableChatrooms(available);
   }, [chatrooms, user]);
-
-  // Filter chatrooms based on search query
-  const filteredChatrooms = searchQuery.trim() === '' 
-    ? joinedChatrooms 
-    : joinedChatrooms.filter(chatroom => 
-        chatroom.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -181,8 +167,6 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
       data-sidebar
     >
-
-
       {/* User info */}
       <div className={`p-4 border-b border-gray-200 dark:border-gray-700 ${
         isSidebarCollapsed ? 'flex flex-col items-center' : ''
@@ -250,31 +234,19 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
         )}
       </div>
 
-      {/* Search and add chatrooms */}
+      {/* Add chatrooms */}
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
         {!isSidebarCollapsed ? (
-          <>
-            <div className="relative mb-3">
-              <input
-                type="text"
-                placeholder="Search chatrooms..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
-              <SearchIcon className="w-5 h-5 text-gray-400 absolute left-3 top-2" />
-            </div>
-            <motion.button
-              onClick={() => setShowChatroomOptions(!showChatroomOptions)}
-              className="w-full px-3 py-2 flex items-center justify-center text-sm text-white bg-primary-500 rounded-md hover:bg-primary-600 transition-colors"
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              id="add-chatroom-button"
-            >
-              <PlusIcon className="w-4 h-4 mr-2" />
-              Add Chatroom
-            </motion.button>
-          </>
+          <motion.button
+            onClick={() => setShowChatroomOptions(!showChatroomOptions)}
+            className="w-full px-3 py-2 flex items-center justify-center text-sm text-white bg-primary-500 rounded-md hover:bg-primary-600 transition-colors"
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            id="add-chatroom-button"
+          >
+            <PlusIcon className="w-4 h-4 mr-2" />
+            Add Chatroom
+          </motion.button>
         ) : (
           <div className="flex flex-col items-center space-y-4">
             <motion.button
@@ -492,7 +464,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
         )}
         <div className={`${isSidebarCollapsed ? 'px-2' : 'px-0'} py-2`}>
           <AnimatePresence>
-            {filteredChatrooms.length > 0 ? (
+            {joinedChatrooms.length > 0 ? (
               <motion.ul
                 initial="hidden"
                 animate="visible"
@@ -506,7 +478,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                   }
                 }}
               >
-                {filteredChatrooms.map((chatroom) => (
+                {joinedChatrooms.map((chatroom) => (
                   <motion.li 
                     key={chatroom.id}
                     variants={{
@@ -548,15 +520,9 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.2 }}
               >
-                {searchQuery ? (
-                  <p className="text-sm">No chatrooms found for &quot;{searchQuery}&quot;</p>
-                ) : (
-                  <>
-                    <UserGroupIcon className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                    <p className="text-sm">You haven&apos;t joined any chatrooms yet.</p>
-                    <p className="text-xs mt-1">Create or join one to get started!</p>
-                  </>
-                )}
+                <UserGroupIcon className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                <p className="text-sm">You haven&apos;t joined any chatrooms yet.</p>
+                <p className="text-xs mt-1">Create or join one to get started!</p>
               </motion.div>
             )}
           </AnimatePresence>
