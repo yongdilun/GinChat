@@ -40,21 +40,56 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
     return () => clearTimeout(timer);
   }, [messages]);
 
-  // Handle image download
-  const handleDownloadImage = (url: string, filename: string) => {
-    // Create a temporary link element
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename || 'image';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   // Extract filename from URL
   const getFilenameFromUrl = (url: string) => {
-    const parts = url.split('/');
-    return parts[parts.length - 1];
+    // Get the filename from the URL path
+    const urlParts = url.split('/');
+    let filename = urlParts[urlParts.length - 1];
+    
+    // Remove query parameters if any
+    filename = filename.split('?')[0];
+    
+    // Make sure we have a valid filename
+    return filename || 'download';
+  };
+
+  // Handle image download
+  const handleDownloadImage = (url: string, filename: string) => {
+    try {
+      // Create a fetch request to get the image data
+      fetch(url)
+        .then(response => response.blob())
+        .then(blob => {
+          // Create a blob URL for the image
+          const blobUrl = URL.createObjectURL(blob);
+          
+          // Create a temporary link element
+          const link = document.createElement('a');
+          link.href = blobUrl;
+          link.download = filename || 'image';
+          
+          // Append to body, click and remove
+          document.body.appendChild(link);
+          link.click();
+          
+          // Clean up
+          document.body.removeChild(link);
+          URL.revokeObjectURL(blobUrl);
+        })
+        .catch(error => {
+          console.error('Error downloading image:', error);
+          // Fallback to simpler approach if fetch fails
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = filename;
+          link.target = '_blank';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        });
+    } catch (error) {
+      console.error('Error in download handler:', error);
+    }
   };
 
   if (!selectedChatroom) {
@@ -251,41 +286,49 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
                             width={250}
                             height={200}
                             className="rounded cursor-pointer transform transition-transform hover:scale-105 object-cover"
-                            onClick={() => message.media_url && setExpandedImage(message.media_url)}
-                          />
-                        </div>
-                        <div className="absolute bottom-2 right-2 opacity-80 hover:opacity-100 transition-opacity duration-200">
-                          <motion.button
-                            className="p-1.5 bg-white rounded-full text-gray-800 shadow-md"
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
                             onClick={(e) => {
+                              e.preventDefault();
                               e.stopPropagation();
                               if (message.media_url) {
-                                handleDownloadImage(message.media_url, getFilenameFromUrl(message.media_url));
+                                setExpandedImage(message.media_url);
                               }
                             }}
-                          >
-                            <ArrowDownIcon className="h-4 w-4" />
-                          </motion.button>
+                          />
                         </div>
                         <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
                           <div className="bg-black bg-opacity-50 w-full h-full flex items-center justify-center">
                             <div className="flex space-x-3">
                               {message.media_url && (
-                                <motion.button
-                                  className="p-2 bg-white rounded-full text-gray-800"
-                                  whileHover={{ scale: 1.1 }}
-                                  whileTap={{ scale: 0.9 }}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (message.media_url) {
-                                      setExpandedImage(message.media_url);
-                                    }
-                                  }}
-                                >
-                                  <MaximizeIcon className="h-5 w-5" />
-                                </motion.button>
+                                <>
+                                  <motion.button
+                                    className="p-2 bg-white rounded-full text-gray-800"
+                                    whileHover={{ scale: 1.1 }}
+                                    whileTap={{ scale: 0.9 }}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      if (message.media_url) {
+                                        setExpandedImage(message.media_url);
+                                      }
+                                    }}
+                                  >
+                                    <MaximizeIcon className="h-5 w-5" />
+                                  </motion.button>
+                                  <motion.button
+                                    className="p-2 bg-white rounded-full text-gray-800"
+                                    whileHover={{ scale: 1.1 }}
+                                    whileTap={{ scale: 0.9 }}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      if (message.media_url) {
+                                        handleDownloadImage(message.media_url, getFilenameFromUrl(message.media_url));
+                                      }
+                                    }}
+                                  >
+                                    <ArrowDownIcon className="h-5 w-5" />
+                                  </motion.button>
+                                </>
                               )}
                             </div>
                           </div>

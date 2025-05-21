@@ -63,17 +63,52 @@ export default function ChatHeader({ chatroom }: ChatHeaderProps) {
   };
 
   const getFilenameFromUrl = (url: string) => {
-    const parts = url.split('/');
-    return parts[parts.length - 1] || 'download';
+    // Get the filename from the URL path
+    const urlParts = url.split('/');
+    let filename = urlParts[urlParts.length - 1];
+    
+    // Remove query parameters if any
+    filename = filename.split('?')[0];
+    
+    // Make sure we have a valid filename
+    return filename || 'download';
   };
 
   const handleDownload = (url: string) => {
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = getFilenameFromUrl(url);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      // Create a fetch request to get the image data
+      fetch(url)
+        .then(response => response.blob())
+        .then(blob => {
+          // Create a blob URL for the image
+          const blobUrl = URL.createObjectURL(blob);
+          
+          // Create a temporary link element
+          const link = document.createElement('a');
+          link.href = blobUrl;
+          link.download = getFilenameFromUrl(url);
+          
+          // Append to body, click and remove
+          document.body.appendChild(link);
+          link.click();
+          
+          // Clean up
+          document.body.removeChild(link);
+          URL.revokeObjectURL(blobUrl);
+        })
+        .catch(error => {
+          console.error('Error downloading image:', error);
+          // Fallback to simpler approach if fetch fails
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = getFilenameFromUrl(url);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        });
+    } catch (error) {
+      console.error('Error in download handler:', error);
+    }
   };
 
   // Toggle content visibility when header is clicked
@@ -182,11 +217,19 @@ export default function ChatHeader({ chatroom }: ChatHeaderProps) {
                           alt={`Image ${index + 1}`}
                           fill
                           className="object-cover rounded-lg cursor-pointer"
-                          onClick={() => handleImageClick(media.url)}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleImageClick(media.url);
+                          }}
                         />
                       </div>
                       <button
-                        onClick={() => handleDownload(media.url)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleDownload(media.url);
+                        }}
                         className="absolute top-2 right-2 p-1 bg-black bg-opacity-50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                       >
                         <DownloadIcon className="w-4 h-4 text-white" aria-hidden="true" />
@@ -254,24 +297,33 @@ export default function ChatHeader({ chatroom }: ChatHeaderProps) {
       {selectedImage && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
           <div className="relative w-full max-w-4xl">
-            <div className="relative w-full" style={{ maxHeight: "calc(100vh - 6rem)", height: "auto" }}>
+            <div className="relative w-full h-[80vh]">
               <Image 
                 src={selectedImage} 
                 alt="Selected image" 
-                className="mx-auto max-h-[80vh] max-w-full object-contain"
                 fill
                 sizes="(max-width: 1024px) 100vw, 1024px"
+                className="object-contain"
+                priority
               />
             </div>
             <div className="absolute top-4 right-4 flex space-x-2">
               <button
-                onClick={() => selectedImage && handleDownload(selectedImage)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (selectedImage) handleDownload(selectedImage);
+                }}
                 className="p-2 bg-black bg-opacity-50 rounded-full text-white hover:bg-opacity-75"
               >
                 <DownloadIcon className="w-6 h-6" aria-hidden="true" />
               </button>
               <button
-                onClick={() => setSelectedImage(null)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setSelectedImage(null);
+                }}
                 className="p-2 bg-black bg-opacity-50 rounded-full text-white hover:bg-opacity-75"
               >
                 <XIcon className="w-6 h-6" aria-hidden="true" />
