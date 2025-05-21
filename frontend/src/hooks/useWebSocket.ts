@@ -2,13 +2,16 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import webSocketManager from '@/services/websocket';
 
 interface WebSocketOptions {
-  onOpen?: (event: Event) => void;
   onMessage?: (event: MessageEvent) => void;
+  onOpen?: (event: Event) => void;
   onClose?: (event: CloseEvent) => void;
   onError?: (event: Event) => void;
-  reconnectInterval?: number;
-  reconnectAttempts?: number;
   headers?: Record<string, string>;
+}
+
+interface WebSocketError extends Error {
+  code?: number;
+  reason?: string;
 }
 
 export const useWebSocket = (url: string, options: WebSocketOptions = {}) => {

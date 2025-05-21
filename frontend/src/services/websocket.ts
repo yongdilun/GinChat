@@ -9,6 +9,17 @@ interface WebSocketOptions {
   headers?: Record<string, string>;
 }
 
+interface WebSocketError extends Error {
+  code?: number;
+  reason?: string;
+}
+
+interface WebSocketResponse {
+  type: string;
+  data: unknown;
+  chatroom_id?: string;
+}
+
 // Create a global WebSocket manager
 class WebSocketManager {
   private static instance: WebSocketManager;

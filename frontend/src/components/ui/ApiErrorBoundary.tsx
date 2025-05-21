@@ -73,7 +73,7 @@ const ApiErrorBoundary = ({ children }: ApiErrorBoundaryProps) => {
     return () => {
       clearInterval(intervalId);
     };
-  }, []);
+  }, [apiError]);
 
   return (
     <>

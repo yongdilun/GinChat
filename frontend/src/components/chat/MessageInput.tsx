@@ -7,6 +7,14 @@ interface MessageInputProps {
   onMessageSent: (message?: any) => void;
 }
 
+interface ApiError {
+  response?: {
+    data?: {
+      error?: string;
+    };
+  };
+}
+
 const MessageInput: React.FC<MessageInputProps> = ({ selectedChatroom, onMessageSent }) => {
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -14,6 +22,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ selectedChatroom, onMessage
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaType, setMediaType] = useState<string>('');
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const sendMessage = async (e: React.FormEvent) => {
@@ -80,6 +89,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ selectedChatroom, onMessage
       onMessageSent(sentMessage);
     } catch (error) {
       console.error('Failed to send message:', error);
+      handleError(error as ApiError);
     } finally {
       setIsSending(false);
     }
@@ -120,6 +130,10 @@ const MessageInput: React.FC<MessageInputProps> = ({ selectedChatroom, onMessage
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+  };
+
+  const handleError = (err: ApiError) => {
+    setError(err.response?.data?.error || 'An error occurred');
   };
 
   if (!selectedChatroom) {

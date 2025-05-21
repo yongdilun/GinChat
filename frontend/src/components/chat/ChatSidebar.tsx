@@ -547,11 +547,11 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                 transition={{ delay: 0.2 }}
               >
                 {searchQuery ? (
-                  <p className="text-sm">No chatrooms found for "{searchQuery}"</p>
+                  <p className="text-sm">No chatrooms found for &quot;{searchQuery}&quot;</p>
                 ) : (
                   <>
                     <UserGroupIcon className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                    <p className="text-sm">You haven't joined any chatrooms yet.</p>
+                    <p className="text-sm">You haven&apos;t joined any chatrooms yet.</p>
                     <p className="text-xs mt-1">Create or join one to get started!</p>
                   </>
                 )}

@@ -56,6 +56,11 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
     return parts[parts.length - 1];
   };
 
+  const handleSomeAction = () => {
+    // Add your logic here
+    console.log('Action performed');
+  };
+
   if (!selectedChatroom) {
     return (
       <div className="h-full overflow-y-auto p-4 bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center">

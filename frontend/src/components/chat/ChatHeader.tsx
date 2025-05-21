@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Image from 'next/image';
 import { Chatroom } from '@/types';
 import { XIcon, PhotographIcon, DocumentTextIcon } from '@heroicons/react/outline';
 
@@ -106,12 +107,15 @@ export default function ChatHeader({ chatroom, onClose }: ChatHeaderProps) {
           <div className="grid grid-cols-3 gap-4">
             {(extendedChatroom.media || []).map((media: Media, index: number) => (
               <div key={index} className="relative group">
-                <img
-                  src={media.url}
-                  alt={`Media ${index + 1}`}
-                  className="w-full h-24 object-cover rounded-lg cursor-pointer"
-                  onClick={() => handleImageClick(media.url)}
-                />
+                <div className="relative w-full h-24">
+                  <Image
+                    src={media.url}
+                    alt={`Media ${index + 1}`}
+                    fill
+                    className="object-cover rounded-lg cursor-pointer"
+                    onClick={() => handleImageClick(media.url)}
+                  />
+                </div>
                 <button
                   onClick={() => handleDownload(media.url)}
                   className="absolute top-2 right-2 p-1 bg-black bg-opacity-50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
@@ -147,11 +151,14 @@ export default function ChatHeader({ chatroom, onClose }: ChatHeaderProps) {
       {selectedImage && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
           <div className="relative max-w-4xl max-h-[90vh]">
-            <img
-              src={selectedImage}
-              alt="Selected media"
-              className="max-w-full max-h-[90vh] object-contain"
-            />
+            <div className="relative w-full h-[90vh]">
+              <Image
+                src={selectedImage}
+                alt="Selected media"
+                fill
+                className="object-contain"
+              />
+            </div>
             <div className="absolute top-4 right-4 flex space-x-2">
               <button
                 onClick={() => handleDownload(selectedImage)}
