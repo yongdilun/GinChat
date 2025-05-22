@@ -16,15 +16,15 @@ const Navbar = () => {
   useEffect(() => {
     // Check if user is logged in - only run in browser
     if (isBrowser) {
-      const token = localStorage.getItem('token');
-      setIsLoggedIn(!!token);
+    const token = localStorage.getItem('token');
+    setIsLoggedIn(!!token);
     }
   }, []);
 
   const handleLogout = () => {
     if (isBrowser) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
       router.push('/auth/login?session=logout');
     }
   };

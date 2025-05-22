@@ -339,7 +339,7 @@ export default function ChatPage() {
       const response = await chatroomAPI.getChatrooms();
       const chatrooms = response.data.chatrooms || [];
       setChatrooms(chatrooms);
-      
+
       // Mark that we've fetched data
       setHasFetchedData(true);
     } catch (err: unknown) {
@@ -455,32 +455,32 @@ export default function ChatPage() {
           {selectedChatroom ? (
             <>
               {/* Chat header - using enhancedSelectedChatroom with media */}
-              <ChatHeader 
+          <ChatHeader 
                 chatroom={enhancedSelectedChatroom} 
-              />
+          />
 
-              {/* Messages */}
+          {/* Messages */}
               <div className="flex-1 overflow-hidden">
-                <MessageList
-                  user={user}
-                  selectedChatroom={selectedChatroom}
-                  messages={messages}
+            <MessageList
+              user={user}
+              selectedChatroom={selectedChatroom}
+              messages={messages}
                   onShowJoinChatroom={handleShowJoinChatroom}
                   onShowCreateChatroom={handleShowCreateChatroom}
-                />
-              </div>
+            />
+          </div>
 
-              {/* Message input */}
-              <MessageInput
-                selectedChatroom={selectedChatroom}
-                onMessageSent={(sentMessage) => {
-                  // If we got a sent message, add it to the messages list using
-                  // our safe add function that prevents duplication
-                  if (sentMessage) {
-                    addMessageSafely(sentMessage);
-                  }
-                }}
-              />
+          {/* Message input */}
+          <MessageInput
+            selectedChatroom={selectedChatroom}
+            onMessageSent={(sentMessage) => {
+              // If we got a sent message, add it to the messages list using
+              // our safe add function that prevents duplication
+              if (sentMessage) {
+                addMessageSafely(sentMessage);
+              }
+            }}
+          />
             </>
           ) : (
             <WelcomePage 

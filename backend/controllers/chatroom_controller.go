@@ -111,6 +111,62 @@ func (cc *ChatroomController) GetChatrooms(c *gin.Context) {
 	})
 }
 
+// GetChatroomByID handles getting a specific chatroom by ID
+// @Summary Get a chatroom by ID
+// @Description Retrieve a specific chatroom by its ID
+// @Tags chatrooms
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Param id path string true "Chatroom ID" example:"60d5f8b8e6b5f0b3e8b4b5b3"
+// @Success 200 {object} map[string]models.ChatroomResponse "Chatroom details"
+// @Failure 400 {object} map[string]string "Invalid chatroom ID"
+// @Failure 401 {object} map[string]string "User not authenticated"
+// @Failure 404 {object} map[string]string "Chatroom not found"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /chatrooms/{id} [get]
+func (cc *ChatroomController) GetChatroomByID(c *gin.Context) {
+	// Get chatroom ID from URL
+	chatroomID, err := primitive.ObjectIDFromHex(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chatroom ID"})
+		return
+	}
+
+	// Get user ID from context (set by auth middleware)
+	_, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	// Get chatroom using the service
+	chatroom, err := cc.ChatroomService.GetChatroomByID(chatroomID)
+	if err != nil {
+		if err.Error() == "chatroom not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		}
+		return
+	}
+
+	// Optional: Check if user is a member of the chatroom
+	// Comment out the following lines if you want to allow non-members to view chatroom info
+	/*
+		isMember := cc.ChatroomService.IsMember(chatroom, userID.(uint))
+		if !isMember {
+			c.JSON(http.StatusForbidden, gin.H{"error": "User is not a member of this chatroom"})
+			return
+		}
+	*/
+
+	// Return chatroom data
+	c.JSON(http.StatusOK, gin.H{
+		"chatroom": chatroom.ToResponse(),
+	})
+}
+
 // JoinChatroom handles joining a chatroom
 // @Summary Join a chatroom
 // @Description Add the authenticated user as a member of the specified chatroom

@@ -124,37 +124,37 @@ export default function ChatHeader({ chatroom }: ChatHeaderProps) {
   const images = getFilteredMedia('image');
   const videos = getFilteredMedia('video');
   const audios = getFilteredMedia('audio');
-
+  
   return (
     <div className="bg-white border-b">
       <div 
         className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50"
         onClick={toggleContent}
       >
-        <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-3">
           <h2 className="text-lg font-semibold text-gray-900">{chatroom.name}</h2>
           <span className="px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded-full">
             {chatroom.members?.length || 0} members
           </span>
         </div>
-      </div>
+              </div>
 
       {showContent && (
         <>
           <div className="border-t">
             <div className="flex">
-              <button
+                  <button
                 className={`flex-1 py-2 text-sm font-medium ${
-                  activeTab === 'members'
+                      activeTab === 'members'
                     ? 'text-primary-600 border-b-2 border-primary-600'
                     : 'text-gray-500 hover:text-gray-700'
-                }`}
+                    }`}
                 onClick={() => setActiveTab('members')}
-              >
+                  >
                 <UserGroupIcon className="w-5 h-5 mx-auto mb-1" aria-hidden="true" />
-                Members
-              </button>
-              <button
+                    Members
+                  </button>
+                  <button
                 className={`flex-1 py-2 text-sm font-medium ${
                   activeTab === 'images'
                     ? 'text-primary-600 border-b-2 border-primary-600'
@@ -164,47 +164,47 @@ export default function ChatHeader({ chatroom }: ChatHeaderProps) {
               >
                 <PhotographIcon className="w-5 h-5 mx-auto mb-1" aria-hidden="true" />
                 Images
-              </button>
-              <button
+                  </button>
+                  <button
                 className={`flex-1 py-2 text-sm font-medium ${
-                  activeTab === 'videos'
+                      activeTab === 'videos'
                     ? 'text-primary-600 border-b-2 border-primary-600'
                     : 'text-gray-500 hover:text-gray-700'
-                }`}
+                    }`}
                 onClick={() => setActiveTab('videos')}
-              >
+                  >
                 <VideoCameraIcon className="w-5 h-5 mx-auto mb-1" aria-hidden="true" />
-                Videos
-              </button>
-              <button
+                    Videos
+                  </button>
+                  <button
                 className={`flex-1 py-2 text-sm font-medium ${
-                  activeTab === 'audio'
+                      activeTab === 'audio'
                     ? 'text-primary-600 border-b-2 border-primary-600'
                     : 'text-gray-500 hover:text-gray-700'
-                }`}
+                    }`}
                 onClick={() => setActiveTab('audio')}
-              >
+                  >
                 <MicrophoneIcon className="w-5 h-5 mx-auto mb-1" aria-hidden="true" />
-                Audio
-              </button>
+                    Audio
+                  </button>
             </div>
-          </div>
+              </div>
 
           <div className="p-4">
-            {activeTab === 'members' && (
+                {activeTab === 'members' && (
               <div className="space-y-2">
                 {chatroom.members.map((member, index) => (
                   <div key={index} className="flex items-center p-2 hover:bg-gray-50 rounded-lg">
                     <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold mr-3">
                       {member.username?.charAt(0).toUpperCase() || 'U'}
-                    </div>
-                    <div>
+                          </div>
+                          <div>
                       <p className="text-sm font-medium">{member.username || `User ${member.user_id}`}</p>
                     </div>
                   </div>
                 ))}
-              </div>
-            )}
+                  </div>
+                )}
 
             {activeTab === 'images' && (
               <div className="grid grid-cols-3 gap-4">
@@ -223,7 +223,7 @@ export default function ChatHeader({ chatroom }: ChatHeaderProps) {
                             handleImageClick(media.url);
                           }}
                         />
-                      </div>
+                        </div>
                       <button
                         onClick={(e) => {
                           e.preventDefault();
@@ -239,8 +239,8 @@ export default function ChatHeader({ chatroom }: ChatHeaderProps) {
                 ) : (
                   <p className="text-sm text-gray-500 col-span-3 text-center py-4">No images in this chatroom</p>
                 )}
-              </div>
-            )}
+                        </div>
+                      )}
 
             {activeTab === 'videos' && (
               <div className="space-y-4">
@@ -264,8 +264,8 @@ export default function ChatHeader({ chatroom }: ChatHeaderProps) {
                 ) : (
                   <p className="text-sm text-gray-500 text-center py-4">No videos in this chatroom</p>
                 )}
-              </div>
-            )}
+                        </div>
+                      )}
 
             {activeTab === 'audio' && (
               <div className="space-y-3">
@@ -331,7 +331,7 @@ export default function ChatHeader({ chatroom }: ChatHeaderProps) {
             </div>
           </div>
         </div>
-      )}
+        )}
     </div>
   );
 }

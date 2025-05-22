@@ -116,7 +116,7 @@ class WebSocketManager {
         if (options?.onClose) {
           options.onClose(event);
         }
-        
+
         // Automatic reconnection is disabled to prevent excessive health checks
         // This helps reduce unnecessary backend API calls
       };

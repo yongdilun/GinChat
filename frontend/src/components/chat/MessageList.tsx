@@ -63,7 +63,7 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
           // Create a blob URL for the image
           const blobUrl = URL.createObjectURL(blob);
           
-          // Create a temporary link element
+    // Create a temporary link element
           const link = document.createElement('a');
           link.href = blobUrl;
           link.download = filename || 'image';
@@ -79,13 +79,13 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
         .catch(error => {
           console.error('Error downloading image:', error);
           // Fallback to simpler approach if fetch fails
-          const link = document.createElement('a');
-          link.href = url;
+    const link = document.createElement('a');
+    link.href = url;
           link.download = filename;
           link.target = '_blank';
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
         });
     } catch (error) {
       console.error('Error in download handler:', error);
@@ -215,7 +215,7 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
               <div className="relative w-[85vw] h-[85vh] max-w-4xl">
                 <Image
                   src={expandedImage || ''}
-                  alt="Expanded view"
+                alt="Expanded view"
                   fill
                   className="object-contain rounded shadow-lg"
                   sizes="(max-width: 1024px) 85vw, 1024px"
@@ -282,7 +282,7 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
                         <div className="relative w-full max-w-xs">
                           <Image
                             src={message.media_url || ''}
-                            alt="Shared image"
+                          alt="Shared image"
                             width={250}
                             height={200}
                             className="rounded cursor-pointer transform transition-transform hover:scale-105 object-cover"
@@ -293,41 +293,41 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
                                 setExpandedImage(message.media_url);
                               }
                             }}
-                          />
+                        />
                         </div>
                         <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
                           <div className="bg-black bg-opacity-50 w-full h-full flex items-center justify-center">
                             <div className="flex space-x-3">
                               {message.media_url && (
                                 <>
-                                  <motion.button
-                                    className="p-2 bg-white rounded-full text-gray-800"
-                                    whileHover={{ scale: 1.1 }}
-                                    whileTap={{ scale: 0.9 }}
-                                    onClick={(e) => {
+                              <motion.button
+                                className="p-2 bg-white rounded-full text-gray-800"
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={(e) => {
                                       e.preventDefault();
-                                      e.stopPropagation();
+                                  e.stopPropagation();
                                       if (message.media_url) {
                                         setExpandedImage(message.media_url);
                                       }
-                                    }}
-                                  >
-                                    <MaximizeIcon className="h-5 w-5" />
-                                  </motion.button>
-                                  <motion.button
-                                    className="p-2 bg-white rounded-full text-gray-800"
-                                    whileHover={{ scale: 1.1 }}
-                                    whileTap={{ scale: 0.9 }}
-                                    onClick={(e) => {
+                                }}
+                              >
+                                <MaximizeIcon className="h-5 w-5" />
+                              </motion.button>
+                              <motion.button
+                                className="p-2 bg-white rounded-full text-gray-800"
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={(e) => {
                                       e.preventDefault();
-                                      e.stopPropagation();
-                                      if (message.media_url) {
-                                        handleDownloadImage(message.media_url, getFilenameFromUrl(message.media_url));
-                                      }
-                                    }}
-                                  >
-                                    <ArrowDownIcon className="h-5 w-5" />
-                                  </motion.button>
+                                  e.stopPropagation();
+                                  if (message.media_url) {
+                                    handleDownloadImage(message.media_url, getFilenameFromUrl(message.media_url));
+                                  }
+                                }}
+                              >
+                                <ArrowDownIcon className="h-5 w-5" />
+                              </motion.button>
                                 </>
                               )}
                             </div>

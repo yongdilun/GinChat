@@ -20,9 +20,9 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     if (isBrowser) {
-      const token = localStorage.getItem('token');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
       }
     }
     return config;
@@ -85,20 +85,20 @@ export const authAPI = {
       const response = await api.post('/api/auth/logout');
       
       if (isBrowser) {
-        // Clear local storage
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        // Redirect to login with logout parameter
-        window.location.href = '/auth/login?session=logout';
+      // Clear local storage
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      // Redirect to login with logout parameter
+      window.location.href = '/auth/login?session=logout';
       }
       
       return response;
     } catch (error) {
       if (isBrowser) {
-        // Still clear storage and redirect even if the API call fails
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.href = '/auth/login?session=logout';
+      // Still clear storage and redirect even if the API call fails
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/auth/login?session=logout';
       }
       throw error;
     }

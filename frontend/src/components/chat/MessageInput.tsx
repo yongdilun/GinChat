@@ -149,11 +149,11 @@ const MessageInput: React.FC<MessageInputProps> = ({ selectedChatroom, onMessage
             {mediaType === 'picture' && (
               <div className="relative w-full h-32">
                 <Image
-                  src={mediaPreview}
-                  alt="Preview"
+                src={mediaPreview}
+                alt="Preview"
                   fill
                   className="object-contain"
-                />
+              />
               </div>
             )}
             {mediaType === 'audio' && (
