@@ -93,8 +93,45 @@ func (cc *ChatroomController) GetChatrooms(c *gin.Context) {
 		return
 	}
 
-	// Get chatrooms using the service
+	// Get all chatrooms using the service
 	chatrooms, err := cc.ChatroomService.GetChatrooms()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Convert to response format
+	var response []interface{}
+	for _, chatroom := range chatrooms {
+		response = append(response, chatroom.ToResponse())
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"chatrooms": response,
+	})
+}
+
+// GetChatroomsByUserID handles getting user's joined chatrooms
+// @Summary Get user's joined chatrooms
+// @Description Retrieve a list of chatrooms the authenticated user has joined
+// @Tags chatrooms
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Success 200 {object} map[string][]models.ChatroomResponse "List of user's chatrooms"
+// @Failure 401 {object} map[string]string "User not authenticated"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /chatrooms/user [get]
+func (cc *ChatroomController) GetChatroomsByUserID(c *gin.Context) {
+	// Get user ID from context (set by auth middleware)
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	// Get user's joined chatrooms using the service
+	chatrooms, err := cc.ChatroomService.GetUserChatrooms(userID.(uint))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

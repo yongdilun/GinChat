@@ -60,6 +60,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, mongodb *mongo.Database, logger *lo
 
 			// Chatroom routes
 			protected.GET("/chatrooms", chatroomController.GetChatrooms)
+			protected.GET("/chatrooms/user", chatroomController.GetChatroomsByUserID)
 			protected.GET("/chatrooms/:id", chatroomController.GetChatroomByID)
 			protected.POST("/chatrooms", chatroomController.CreateChatroom)
 			protected.POST("/chatrooms/:id/join", chatroomController.JoinChatroom)

@@ -110,15 +110,21 @@ export const authAPI = {
 
   logout: async () => {
     try {
-      // Add server-side logout if necessary
-      await api.post('/auth/logout');
+      console.log('[API] Attempting server-side logout...');
+      const token = await AsyncStorage.getItem('token');
+      console.log('[API] Token for logout:', token ? 'Present' : 'Missing');
+      
+      const response = await api.post('/auth/logout');
+      console.log('[API] Server logout successful:', response.status);
     } catch (error) {
-      console.warn('Server logout failed, continuing with local logout');
+      console.warn('[API] Server logout failed, continuing with local logout:', error);
     }
 
     // Always clear local storage
+    console.log('[API] Clearing local storage...');
     await AsyncStorage.removeItem('token');
     await AsyncStorage.removeItem('user');
+    console.log('[API] Local storage cleared');
   },
 
   getCurrentUser: async () => {
@@ -286,37 +292,52 @@ export const mediaAPI = {
 export const chatAPI = {
   getConversations: async (): Promise<{ chatrooms: Chatroom[] }> => {
     try {
-      console.log('Fetching conversations...');
-      // Try the chatrooms endpoint instead of conversations
-      let response;
-      try {
-        response = await api.get('/chatrooms');
-        console.log('Successfully fetched chatrooms');
-      } catch (err) {
-        console.log('Chatrooms endpoint failed, trying chats endpoint...');
-        response = await api.get('/chats');
-        console.log('Successfully fetched chats');
-      }
+      console.log('[API] Fetching user\'s joined chatrooms...');
+      const response = await api.get('/chatrooms/user');
+      console.log('[API] Successfully fetched user chatrooms:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Failed to fetch conversations:', error);
+      console.error('[API] Failed to fetch user conversations:', error);
+      if (axios.isAxiosError(error)) {
+        console.error('[API] Error status:', error.response?.status);
+        console.error('[API] Error data:', error.response?.data);
+      }
       // Return empty array to avoid crashes
       return { chatrooms: [] };
     }
   },
 
-  getConversationById: async (id: string): Promise<{ chatroom: Chatroom }> => {
+  getAllAvailableChatrooms: async (): Promise<{ chatrooms: Chatroom[] }> => {
     try {
-      console.log(`Fetching conversation with ID: ${id}`);
-      let response;
-      try {
-        response = await api.get(`/chatrooms/${id}`);
-      } catch (err) {
-        response = await api.get(`/chats/${id}`);
-      }
+      console.log('[API] Fetching all available chatrooms...');
+      const response = await api.get('/chatrooms');
+      console.log('[API] Successfully fetched all available chatrooms:', response.data);
       return response.data;
     } catch (error) {
-      console.error(`Failed to fetch conversation ${id}:`, error);
+      console.error('[API] Failed to fetch all available chatrooms:', error);
+      if (axios.isAxiosError(error)) {
+        console.error('[API] Error status:', error.response?.status);
+        console.error('[API] Error data:', error.response?.data);
+      }
+      // Return empty array to avoid crashes
+      return { chatrooms: [] };
+    }
+  },
+
+ 
+
+  getConversationById: async (id: string): Promise<{ chatroom: Chatroom }> => {
+    try {
+      console.log(`[API] Fetching conversation with ID: ${id}`);
+      const response = await api.get(`/chatrooms/${id}`);
+      console.log(`[API] Successfully fetched conversation ${id}:`, response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`[API] Failed to fetch conversation ${id}:`, error);
+      if (axios.isAxiosError(error)) {
+        console.error('[API] Error status:', error.response?.status);
+        console.error('[API] Error data:', error.response?.data);
+      }
       // Return a default conversation object to avoid crashes
       return {
         chatroom: {
@@ -332,30 +353,38 @@ export const chatAPI = {
 
   createConversation: async (name: string) => {
     try {
-      console.log('Creating conversation with name:', name);
+      console.log('[API] Creating conversation with name:', name);
       if (!name || name.length < 3) {
         throw new Error('Chatroom name must be at least 3 characters long');
       }
 
-      // Only use the chatrooms endpoint with the required name parameter
       const response = await api.post('/chatrooms', { name });
-      console.log('Create chatroom response:', response.data);
+      console.log('[API] Create chatroom response:', response.data);
 
       // The backend returns {chatroom: {...}} structure
       return response.data;
     } catch (error) {
-      console.error('Failed to create conversation:', error);
+      console.error('[API] Failed to create conversation:', error);
+      if (axios.isAxiosError(error)) {
+        console.error('[API] Error status:', error.response?.status);
+        console.error('[API] Error data:', error.response?.data);
+      }
       throw error;
     }
   },
 
   joinChatroom: async (chatroomId: string) => {
     try {
-      console.log(`Joining chatroom with ID: ${chatroomId}`);
+      console.log(`[API] Joining chatroom with ID: ${chatroomId}`);
       const response = await api.post(`/chatrooms/${chatroomId}/join`);
+      console.log(`[API] Successfully joined chatroom ${chatroomId}:`, response.data);
       return response.data;
     } catch (error) {
-      console.error(`Failed to join chatroom ${chatroomId}:`, error);
+      console.error(`[API] Failed to join chatroom ${chatroomId}:`, error);
+      if (axios.isAxiosError(error)) {
+        console.error('[API] Error status:', error.response?.status);
+        console.error('[API] Error data:', error.response?.data);
+      }
       throw error;
     }
   },
@@ -366,8 +395,7 @@ export const chatAPI = {
     media_url?: string;
   }) => {
     try {
-      console.log(`Sending message to conversation ${conversationId}:`, content);
-      let response;
+      console.log(`[API] Sending message to conversation ${conversationId}:`, content);
 
       // Prepare message data
       let messageData: any;
@@ -387,39 +415,35 @@ export const chatAPI = {
         };
       }
 
-      console.log('Prepared message data:', JSON.stringify(messageData, null, 2));
+      console.log('[API] Prepared message data:', JSON.stringify(messageData, null, 2));
 
-      try {
-        response = await api.post(`/chatrooms/${conversationId}/messages`, messageData);
-        console.log('Message sent successfully:', response.data);
-      } catch (err) {
-        console.log('Chatroom endpoint failed, trying chat endpoint...');
-        response = await api.post(`/chats/${conversationId}/messages`, messageData);
-        console.log('Message sent successfully via chat endpoint:', response.data);
-      }
+      const response = await api.post(`/chatrooms/${conversationId}/messages`, messageData);
+      console.log('[API] Message sent successfully:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Failed to send message:', error);
+      console.error('[API] Failed to send message:', error);
+      if (axios.isAxiosError(error)) {
+        console.error('[API] Error status:', error.response?.status);
+        console.error('[API] Error data:', error.response?.data);
+      }
       throw error;
     }
   },
 
   getMessages: async (conversationId: string, page = 1, limit = 20): Promise<{ messages: Message[] }> => {
     try {
-      console.log(`Fetching messages for conversation ${conversationId}`);
-      let response;
-      try {
-        response = await api.get(
-          `/chatrooms/${conversationId}/messages?page=${page}&limit=${limit}`
-        );
-      } catch (err) {
-        response = await api.get(
-          `/chats/${conversationId}/messages?page=${page}&limit=${limit}`
-        );
-      }
+      console.log(`[API] Fetching messages for conversation ${conversationId}`);
+      const response = await api.get(
+        `/chatrooms/${conversationId}/messages?page=${page}&limit=${limit}`
+      );
+      console.log(`[API] Successfully fetched messages for ${conversationId}:`, response.data);
       return response.data;
     } catch (error) {
-      console.error('Failed to fetch messages:', error);
+      console.error(`[API] Failed to fetch messages for ${conversationId}:`, error);
+      if (axios.isAxiosError(error)) {
+        console.error('[API] Error status:', error.response?.status);
+        console.error('[API] Error data:', error.response?.data);
+      }
       // Return empty array to avoid crashes
       return { messages: [] };
     }

@@ -79,6 +79,28 @@ func (s *ChatroomService) GetChatrooms() ([]models.Chatroom, error) {
 	return chatrooms, nil
 }
 
+// GetUserChatrooms retrieves chatrooms that a user has joined
+func (s *ChatroomService) GetUserChatrooms(userID uint) ([]models.Chatroom, error) {
+	// Find chatrooms where the user is a member
+	filter := bson.M{
+		"members.user_id": userID,
+	}
+	
+	cursor, err := s.ChatColl.Find(context.Background(), filter)
+	if err != nil {
+		return nil, errors.New("failed to get user chatrooms")
+	}
+	defer cursor.Close(context.Background())
+
+	// Decode chatrooms
+	var chatrooms []models.Chatroom
+	if err := cursor.All(context.Background(), &chatrooms); err != nil {
+		return nil, errors.New("failed to decode user chatrooms")
+	}
+
+	return chatrooms, nil
+}
+
 // GetChatroomByID retrieves a chatroom by ID
 func (s *ChatroomService) GetChatroomByID(chatroomID primitive.ObjectID) (*models.Chatroom, error) {
 	var chatroom models.Chatroom
