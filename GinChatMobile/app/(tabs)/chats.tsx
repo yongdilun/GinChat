@@ -307,18 +307,11 @@ export default function ChatsScreen() {
               <TouchableOpacity
                 style={styles.logoutButton}
                 onPress={() => {
-                  Alert.alert(
-                    'Logout',
-                    'Are you sure you want to logout?',
-                    [
-                      { text: 'Cancel', style: 'cancel' },
-                      { 
-                        text: 'Logout', 
-                        style: 'destructive',
-                        onPress: logout
-                      }
-                    ]
-                  );
+                  console.log('=== LOGOUT BUTTON PRESSED ===');
+                  console.log('[ChatsScreen] User pressed logout button at:', new Date().toISOString());
+                  console.log('[ChatsScreen] Current user:', user);
+                  console.log('[ChatsScreen] Calling logout function directly...');
+                  logout();
                 }}
                 activeOpacity={0.8}
               >

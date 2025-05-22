@@ -109,22 +109,88 @@ export const authAPI = {
   },
 
   logout: async () => {
+    console.log('=== API LOGOUT PROCESS STARTED ===');
+    console.log('[API] Timestamp:', new Date().toISOString());
+    
     try {
-      console.log('[API] Attempting server-side logout...');
+      // Step 1: Check token availability
+      console.log('[API] STEP 1: Checking authentication token...');
       const token = await AsyncStorage.getItem('token');
-      console.log('[API] Token for logout:', token ? 'Present' : 'Missing');
+      console.log('[API] Token status:', token ? 'Present' : 'Missing');
+      if (token) {
+        console.log('[API] Token length:', token.length);
+        console.log('[API] Token preview:', token.substring(0, 20) + '...');
+      }
       
+      // Step 2: Make server logout request
+      console.log('[API] STEP 2: Making server logout request...');
+      console.log('[API] Request URL:', `${API_URL}/auth/logout`);
+      console.log('[API] Request method: POST');
+      console.log('[API] Authorization header will be set by interceptor');
+      
+      const startTime = Date.now();
       const response = await api.post('/auth/logout');
-      console.log('[API] Server logout successful:', response.status);
+      const endTime = Date.now();
+      
+      console.log('[API] ✅ Server logout successful!');
+      console.log('[API] Response status:', response.status);
+      console.log('[API] Response time:', endTime - startTime, 'ms');
+      console.log('[API] Response headers:', response.headers);
+      console.log('[API] Response data:', response.data);
+      
     } catch (error) {
-      console.warn('[API] Server logout failed, continuing with local logout:', error);
+      console.warn('=== API LOGOUT SERVER REQUEST FAILED ===');
+      console.warn('[API] ⚠️ Server logout failed, continuing with local logout');
+      console.warn('[API] Error type:', typeof error);
+      
+      if (axios.isAxiosError(error)) {
+        console.warn('[API] Axios error details:');
+        console.warn('[API] - Status:', error.response?.status);
+        console.warn('[API] - Status text:', error.response?.statusText);
+        console.warn('[API] - Response data:', error.response?.data);
+        console.warn('[API] - Request URL:', error.config?.url);
+        console.warn('[API] - Request method:', error.config?.method);
+        console.warn('[API] - Request headers:', error.config?.headers);
+        
+        if (error.code) {
+          console.warn('[API] - Error code:', error.code);
+        }
+        if (error.message) {
+          console.warn('[API] - Error message:', error.message);
+        }
+      } else {
+        console.warn('[API] Non-axios error:', error);
+        if (error instanceof Error) {
+          console.warn('[API] Error message:', error.message);
+          console.warn('[API] Error stack:', error.stack);
+        }
+      }
     }
 
-    // Always clear local storage
-    console.log('[API] Clearing local storage...');
-    await AsyncStorage.removeItem('token');
-    await AsyncStorage.removeItem('user');
-    console.log('[API] Local storage cleared');
+    // Step 3: Always clear local storage regardless of server response
+    console.log('[API] STEP 3: Clearing local storage (always executed)...');
+    try {
+      console.log('[API] Removing token from AsyncStorage...');
+      await AsyncStorage.removeItem('token');
+      console.log('[API] ✅ Token removed from AsyncStorage');
+      
+      console.log('[API] Removing user from AsyncStorage...');
+      await AsyncStorage.removeItem('user');
+      console.log('[API] ✅ User removed from AsyncStorage');
+      
+      // Verify storage is cleared
+      const remainingToken = await AsyncStorage.getItem('token');
+      const remainingUser = await AsyncStorage.getItem('user');
+      console.log('[API] Verification - remaining token:', remainingToken);
+      console.log('[API] Verification - remaining user:', remainingUser);
+      
+      console.log('[API] ✅ Local storage cleared successfully');
+    } catch (storageError) {
+      console.error('[API] ❌ Failed to clear local storage:', storageError);
+      throw storageError; // Re-throw to let caller handle
+    }
+    
+    console.log('=== API LOGOUT PROCESS COMPLETED ===');
   },
 
   getCurrentUser: async () => {

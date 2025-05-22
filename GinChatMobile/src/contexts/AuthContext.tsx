@@ -116,53 +116,122 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Logout function
   const logout = async () => {
-    console.log('[AuthContext] Logout function called');
+    console.log('=== LOGOUT PROCESS STARTED ===');
+    console.log('[AuthContext] Logout function called at:', new Date().toISOString());
+    console.log('[AuthContext] Current user state:', user);
+    console.log('[AuthContext] Current token state:', token ? 'Present' : 'Not present');
+    console.log('[AuthContext] Current isLoading state:', isLoading);
+    
     setIsLoading(true);
+    console.log('[AuthContext] Set isLoading to true');
+
     try {
-      // Disconnect WebSocket before logging out
-      console.log('[AuthContext] Disconnecting WebSocket due to logout.');
+      // Step 1: Disconnect WebSocket
+      console.log('[AuthContext] STEP 1: Disconnecting WebSocket...');
       try {
         webSocketService.disconnect(); 
+        console.log('[AuthContext] ✅ WebSocket disconnected successfully');
       } catch (wsError) {
-        console.warn('[AuthContext] WebSocket disconnect error (continuing logout):', wsError);
+        console.warn('[AuthContext] ⚠️ WebSocket disconnect error (continuing logout):', wsError);
       }
 
-      console.log('[AuthContext] Calling backend logout API...');
+      // Step 2: Call backend logout API
+      console.log('[AuthContext] STEP 2: Calling backend logout API...');
       try {
-        await authAPI.logout(); // Call the backend logout
-        console.log('[AuthContext] Backend logout successful');
+        const startTime = Date.now();
+        await authAPI.logout();
+        const endTime = Date.now();
+        console.log('[AuthContext] ✅ Backend logout successful in', endTime - startTime, 'ms');
       } catch (apiError) {
-        console.warn('[AuthContext] Backend logout failed (continuing with local logout):', apiError);
+        console.warn('[AuthContext] ⚠️ Backend logout failed (continuing with local logout):', apiError);
+        if (apiError && typeof apiError === 'object') {
+          console.warn('[AuthContext] API Error details:', JSON.stringify(apiError, null, 2));
+        }
       }
       
-      console.log('[AuthContext] Clearing local storage...');
-      await AsyncStorage.removeItem('user'); // Clear user from storage
-      await AsyncStorage.removeItem('token'); // Clear token from storage
+      // Step 3: Clear local storage
+      console.log('[AuthContext] STEP 3: Clearing local storage...');
+      try {
+        const userRemoved = await AsyncStorage.removeItem('user');
+        console.log('[AuthContext] ✅ User removed from storage, result:', userRemoved);
+        
+        const tokenRemoved = await AsyncStorage.removeItem('token');
+        console.log('[AuthContext] ✅ Token removed from storage, result:', tokenRemoved);
+        
+        // Verify storage is cleared
+        const remainingUser = await AsyncStorage.getItem('user');
+        const remainingToken = await AsyncStorage.getItem('token');
+        console.log('[AuthContext] Verification - remaining user:', remainingUser);
+        console.log('[AuthContext] Verification - remaining token:', remainingToken);
+      } catch (storageError) {
+        console.error('[AuthContext] ❌ Storage clearing error:', storageError);
+        throw storageError;
+      }
       
-      console.log('[AuthContext] Clearing state...');
-      setUser(null); // Clear user state
-      setToken(null); // Clear token state
+      // Step 4: Clear state
+      console.log('[AuthContext] STEP 4: Clearing application state...');
+      console.log('[AuthContext] Setting user to null (was:', user, ')');
+      setUser(null);
+      console.log('[AuthContext] Setting token to null (was:', token ? 'present' : 'null', ')');
+      setToken(null);
       
-      console.log('[AuthContext] Navigating to login...');
-      // Use immediate navigation instead of setTimeout
-      router.replace('/login'); // Redirect to login
+      // Step 5: Navigate to login
+      console.log('[AuthContext] STEP 5: Navigating to login page...');
+      console.log('[AuthContext] Current router state before navigation');
       
-      console.log('[AuthContext] Logout completed successfully');
+      try {
+        router.replace('/login');
+        console.log('[AuthContext] ✅ Navigation to /login initiated');
+        
+        // Add a small delay to ensure navigation completes
+        setTimeout(() => {
+          console.log('[AuthContext] Navigation timeout completed');
+        }, 100);
+        
+      } catch (navError) {
+        console.error('[AuthContext] ❌ Navigation error:', navError);
+        // Try alternative navigation
+        try {
+          router.push('/login');
+          console.log('[AuthContext] ✅ Alternative navigation with push successful');
+        } catch (altNavError) {
+          console.error('[AuthContext] ❌ Alternative navigation failed:', altNavError);
+        }
+      }
+      
+      console.log('[AuthContext] ✅ Logout process completed successfully');
 
     } catch (error) {
-      console.error('[AuthContext] Critical error during logout:', error);
-      // Even if everything fails, attempt to clear local state and redirect
+      console.error('=== LOGOUT PROCESS FAILED ===');
+      console.error('[AuthContext] ❌ Critical error during logout:', error);
+      console.error('[AuthContext] Error type:', typeof error);
+      console.error('[AuthContext] Error message:', error instanceof Error ? error.message : 'Unknown error');
+      console.error('[AuthContext] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      
+      // Emergency cleanup - even if everything fails, attempt to clear local state and redirect
+      console.log('[AuthContext] EMERGENCY CLEANUP: Attempting to clear state...');
       try {
         await AsyncStorage.removeItem('user');
         await AsyncStorage.removeItem('token');
+        console.log('[AuthContext] ✅ Emergency storage cleanup successful');
       } catch (storageError) {
-        console.error('[AuthContext] Failed to clear storage:', storageError);
+        console.error('[AuthContext] ❌ Emergency storage cleanup failed:', storageError);
       }
+      
       setUser(null);
       setToken(null);
-      router.replace('/login');
+      console.log('[AuthContext] ✅ Emergency state cleanup completed');
+      
+      try {
+        router.replace('/login');
+        console.log('[AuthContext] ✅ Emergency navigation successful');
+      } catch (navError) {
+        console.error('[AuthContext] ❌ Emergency navigation failed:', navError);
+      }
     } finally {
+      console.log('[AuthContext] FINALLY: Setting isLoading to false');
       setIsLoading(false);
+      console.log('=== LOGOUT PROCESS ENDED ===');
     }
   };
 
