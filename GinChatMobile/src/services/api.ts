@@ -1,5 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 // Use the hosted backend URL
 const API_URL = 'https://ginchat-14ry.onrender.com/api';
@@ -18,7 +19,7 @@ interface ApiErrorResponse {
 const handleApiError = (error: unknown) => {
   if (axios.isAxiosError(error)) {
     const axiosError = error as AxiosError<ApiErrorResponse>;
-    
+
     if (!axiosError.response) {
       // Network error
       return Promise.reject({
@@ -26,9 +27,9 @@ const handleApiError = (error: unknown) => {
         message: 'Network error. Please check your internet connection.'
       });
     }
-    
+
     const statusCode = axiosError.response?.status;
-    
+
     if (statusCode === 401) {
       // Handle authentication errors
       AsyncStorage.removeItem('token');
@@ -37,13 +38,13 @@ const handleApiError = (error: unknown) => {
         message: 'Your session has expired. Please login again.'
       });
     }
-    
+
     return Promise.reject({
       status: statusCode,
       message: axiosError.response?.data?.message || 'An error occurred'
     });
   }
-  
+
   console.error('Unknown API Error:', error);
   return Promise.reject({
     status: 'unknown',
@@ -89,7 +90,7 @@ export const authAPI = {
       // Store auth data
       await AsyncStorage.setItem('token', response.data.token);
       await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
-      
+
       console.log('User data stored in AsyncStorage');
       return response.data;
     } catch (error) {
@@ -97,7 +98,7 @@ export const authAPI = {
       throw error;
     }
   },
-  
+
   register: async (name: string, email: string, password: string) => {
     try {
       const response = await api.post('/auth/register', { name, email, password });
@@ -106,7 +107,7 @@ export const authAPI = {
       throw error;
     }
   },
-  
+
   logout: async () => {
     try {
       // Add server-side logout if necessary
@@ -114,12 +115,12 @@ export const authAPI = {
     } catch (error) {
       console.warn('Server logout failed, continuing with local logout');
     }
-    
+
     // Always clear local storage
     await AsyncStorage.removeItem('token');
     await AsyncStorage.removeItem('user');
   },
-  
+
   getCurrentUser: async () => {
     try {
       const response = await api.get('/auth/me');
@@ -169,6 +170,119 @@ export interface Chatroom {
 }
 
 // Chat API calls
+// Media API calls
+export const mediaAPI = {
+  uploadMedia: async (file: { uri: string; type: string; name?: string }, messageType: string) => {
+    try {
+      // Validate message type
+      const validMessageTypes = ['picture', 'audio', 'video', 'text_and_picture', 'text_and_audio', 'text_and_video'];
+      if (!validMessageTypes.includes(messageType)) {
+        messageType = 'picture';
+      }
+
+      // Ensure file has a valid name
+      let fileName = file.name;
+      if (!fileName) {
+        // Generate filename based on timestamp if not provided
+        const timestamp = new Date().getTime();
+        const extension = file.type === 'image/jpeg' || file.type === 'image/jpg' ? 'jpg' : 
+                          file.type === 'image/png' ? 'png' :
+                          file.type === 'video/mp4' ? 'mp4' : 
+                          file.type === 'audio/mpeg' ? 'mp3' : 'bin';
+        fileName = `upload_${timestamp}.${extension}`;
+      }
+
+      // Get token
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      // Handle data URIs - Convert Base64 to Blob
+      let fileBlob;
+      let fileUri = file.uri;
+      
+      if (fileUri.startsWith('data:')) {
+        // Parse the data URI to get MIME type and Base64 data
+        const match = fileUri.match(/^data:([^;]+);base64,(.+)$/);
+        
+        if (!match) {
+          throw new Error('Invalid data URI format');
+        }
+        
+        const mimeType = match[1] || file.type;
+        const base64Data = match[2];
+        
+        // Convert base64 to binary
+        const binaryString = atob(base64Data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        
+        // Create blob from binary data
+        fileBlob = new Blob([bytes], { type: mimeType });
+        
+        // For React Native, we need a URI, not a blob
+        // Since we're in web mode, we can use URL.createObjectURL
+        fileUri = URL.createObjectURL(fileBlob);
+      } else if (Platform.OS === 'ios' && fileUri.startsWith('file://')) {
+        fileUri = fileUri.replace('file://', '');
+      }
+
+      // Create FormData for the upload
+      const formData = new FormData();
+
+      // Special handling for web (Expo Web) vs native
+      if (Platform.OS === 'web') {
+        if (fileBlob) {
+          // If we created a blob earlier, use it directly
+          formData.append('file', fileBlob, fileName);
+        } else {
+          // Try to fetch the file data first
+          try {
+            const response = await fetch(fileUri);
+            const blob = await response.blob();
+            formData.append('file', blob, fileName);
+          } catch (error) {
+            console.error('Error fetching file blob:', error);
+            throw new Error('Could not fetch file data');
+          }
+        }
+      } else {
+        // For native platforms, use the standard React Native approach
+        formData.append('file', {
+          uri: fileUri,
+          type: file.type || 'application/octet-stream',
+          name: fileName
+        } as any);
+      }
+      
+      // Add message_type parameter
+      formData.append('message_type', messageType);
+
+      // Use axios for better cross-platform compatibility
+      const response = await axios.post(`${API_URL}/media/upload`, formData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          // Let axios set the content-type header with boundary
+          ...(Platform.OS !== 'web' ? { 'Content-Type': 'multipart/form-data' } : {})
+        }
+      });
+      
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        console.error('Upload failed:', error.response?.status);
+      } else {
+        console.error('Upload error:', error);
+      }
+      throw error;
+    }
+  }
+};
+
 export const chatAPI = {
   getConversations: async (): Promise<{ chatrooms: Chatroom[] }> => {
     try {
@@ -190,7 +304,7 @@ export const chatAPI = {
       return { chatrooms: [] };
     }
   },
-  
+
   getConversationById: async (id: string): Promise<{ chatroom: Chatroom }> => {
     try {
       console.log(`Fetching conversation with ID: ${id}`);
@@ -215,18 +329,18 @@ export const chatAPI = {
       };
     }
   },
-  
+
   createConversation: async (name: string) => {
     try {
       console.log('Creating conversation with name:', name);
       if (!name || name.length < 3) {
         throw new Error('Chatroom name must be at least 3 characters long');
       }
-      
+
       // Only use the chatrooms endpoint with the required name parameter
       const response = await api.post('/chatrooms', { name });
       console.log('Create chatroom response:', response.data);
-      
+
       // The backend returns {chatroom: {...}} structure
       return response.data;
     } catch (error) {
@@ -234,7 +348,7 @@ export const chatAPI = {
       throw error;
     }
   },
-  
+
   joinChatroom: async (chatroomId: string) => {
     try {
       console.log(`Joining chatroom with ID: ${chatroomId}`);
@@ -245,7 +359,7 @@ export const chatAPI = {
       throw error;
     }
   },
-  
+
   sendMessage: async (conversationId: string, content: string | {
     message_type: MessageType;
     text_content?: string;
@@ -254,15 +368,34 @@ export const chatAPI = {
     try {
       console.log(`Sending message to conversation ${conversationId}:`, content);
       let response;
-      const messageData = typeof content === 'string' ? { 
-        message_type: 'text' as MessageType,
-        text_content: content 
-      } : content;
-      
+
+      // Prepare message data
+      let messageData: any;
+      if (typeof content === 'string') {
+        messageData = {
+          message_type: 'text' as MessageType,
+          text_content: content
+        };
+      } else {
+        // Make sure we're not sending empty strings
+        messageData = {
+          message_type: content.message_type,
+          // Only include text_content if it's not empty
+          ...(content.text_content && content.text_content.trim() ? { text_content: content.text_content.trim() } : {}),
+          // Only include media_url if it's not empty
+          ...(content.media_url ? { media_url: content.media_url } : {})
+        };
+      }
+
+      console.log('Prepared message data:', JSON.stringify(messageData, null, 2));
+
       try {
         response = await api.post(`/chatrooms/${conversationId}/messages`, messageData);
+        console.log('Message sent successfully:', response.data);
       } catch (err) {
+        console.log('Chatroom endpoint failed, trying chat endpoint...');
         response = await api.post(`/chats/${conversationId}/messages`, messageData);
+        console.log('Message sent successfully via chat endpoint:', response.data);
       }
       return response.data;
     } catch (error) {
@@ -270,7 +403,7 @@ export const chatAPI = {
       throw error;
     }
   },
-  
+
   getMessages: async (conversationId: string, page = 1, limit = 20): Promise<{ messages: Message[] }> => {
     try {
       console.log(`Fetching messages for conversation ${conversationId}`);
