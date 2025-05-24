@@ -518,9 +518,15 @@ func (wsc *WebSocketController) BroadcastUnreadCountUpdate(userID uint, unreadDa
 	// Send directly to user's connections
 	wsc.clientsMux.RLock()
 	if connections, ok := wsc.clients[userID]; ok {
+		wsc.logger.Infof("Broadcasting unread count update to user %d (%d connections)", userID, len(connections))
 		for conn := range connections {
-			conn.WriteMessage(websocket.TextMessage, jsonMessage)
+			err := conn.WriteMessage(websocket.TextMessage, jsonMessage)
+			if err != nil {
+				wsc.logger.Errorf("Failed to send unread count update to user %d: %v", userID, err)
+			}
 		}
+	} else {
+		wsc.logger.Warnf("No WebSocket connections found for user %d", userID)
 	}
 	wsc.clientsMux.RUnlock()
 }

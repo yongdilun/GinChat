@@ -109,6 +109,26 @@ func (mc *MessageController) SendMessage(c *gin.Context) {
 	// Check if GlobalWebSocketController is available
 	if GlobalWebSocketController != nil {
 		GlobalWebSocketController.BroadcastNewMessage(chatroomID.Hex(), messageResponse)
+
+		// Also send unread count updates to all chatroom members for sidebar updates
+		chatroom, err := mc.MessageService.ChatSvc.GetChatroomByID(chatroomID)
+		if err == nil {
+			fmt.Printf("Sending unread count updates to %d chatroom members\n", len(chatroom.Members))
+			for _, member := range chatroom.Members {
+				// Skip the sender (they don't get unread count for their own message)
+				if member.UserID != userID.(uint) {
+					unreadCounts, err := mc.MessageService.ReadStatusSvc.GetUnreadCountForUser(member.UserID)
+					if err == nil {
+						fmt.Printf("Broadcasting unread count update to user %d\n", member.UserID)
+						BroadcastUnreadCountUpdateGlobal(member.UserID, unreadCounts)
+					} else {
+						fmt.Printf("Failed to get unread counts for user %d: %v\n", member.UserID, err)
+					}
+				}
+			}
+		} else {
+			fmt.Printf("Failed to get chatroom for unread count updates: %v\n", err)
+		}
 	} else {
 		fmt.Println("Warning: GlobalWebSocketController is nil, cannot broadcast message")
 	}
