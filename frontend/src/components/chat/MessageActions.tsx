@@ -313,7 +313,9 @@ const MessageActions: React.FC<MessageActionsProps> = ({
         {/* Dropdown Trigger Button */}
         <motion.button
           onClick={() => setShowDropdown(!showDropdown)}
-          className="p-1 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+          className={`p-1 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-all duration-200 ${
+            showDropdown ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+          }`}
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
           title="Message options"

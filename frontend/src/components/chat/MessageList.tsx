@@ -256,7 +256,7 @@ const MessageList: React.FC<MessageListProps> = ({
                 delay: index * 0.05,
                 duration: 0.3
               }}
-              className={`${
+              className={`group relative ${
                 message.sender_id === user?.user_id ? 'text-right' : 'text-left'
               }`}
             >
@@ -376,17 +376,19 @@ const MessageList: React.FC<MessageListProps> = ({
                 </div>
               </div>
 
-              {/* Message Actions - Outside the message bubble to prevent height issues */}
+              {/* Message Actions - Positioned as overlay */}
               {onEditMessage && onDeleteMessage && editingMessageId !== message.id && (
-                <MessageActions
-                  message={message}
-                  user={user}
-                  onEdit={onEditMessage}
-                  onDelete={onDeleteMessage}
-                  isEditing={false}
-                  onStartEdit={() => setEditingMessageId(message.id)}
-                  onCancelEdit={() => setEditingMessageId(null)}
-                />
+                <div className={`absolute ${message.sender_id === user?.user_id ? 'left-0 top-0' : 'right-0 top-0'} -mt-2 ${message.sender_id === user?.user_id ? '-ml-8' : '-mr-8'}`}>
+                  <MessageActions
+                    message={message}
+                    user={user}
+                    onEdit={onEditMessage}
+                    onDelete={onDeleteMessage}
+                    isEditing={false}
+                    onStartEdit={() => setEditingMessageId(message.id)}
+                    onCancelEdit={() => setEditingMessageId(null)}
+                  />
+                </div>
               )}
 
               {/* Editing Interface - Separate from message bubble */}
