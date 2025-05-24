@@ -30,7 +30,14 @@ func NewChatroomController(db *gorm.DB, mongodb *mongo.Database) *ChatroomContro
 
 // CreateChatroomRequest represents the request body for creating a chatroom
 type CreateChatroomRequest struct {
-	Name string `json:"name" binding:"required,min=3,max=100" example:"General Chat"` // The name of the chatroom
+	Name     string `json:"name" binding:"required,min=3,max=100" example:"General Chat"` // The name of the chatroom
+	Password string `json:"password" example:"secret123"`                                 // Optional password for the chatroom
+}
+
+// JoinChatroomByCodeRequest represents the request body for joining a chatroom by code
+type JoinChatroomByCodeRequest struct {
+	RoomCode string `json:"room_code" binding:"required,len=6" example:"ABC123"` // The 6-character room code
+	Password string `json:"password" example:"secret123"`                        // Password if the room is protected
 }
 
 // CreateChatroom handles chatroom creation
@@ -63,7 +70,7 @@ func (cc *ChatroomController) CreateChatroom(c *gin.Context) {
 	username, _ := c.Get("username")
 
 	// Create chatroom using the service
-	chatroom, err := cc.ChatroomService.CreateChatroom(req.Name, userID.(uint), username.(string))
+	chatroom, err := cc.ChatroomService.CreateChatroom(req.Name, userID.(uint), username.(string), req.Password)
 	if err != nil {
 		if err.Error() == "chatroom with this name already exists" {
 			c.JSON(http.StatusConflict, gin.H{"error": utils.FormatServiceError(err)})
@@ -106,7 +113,7 @@ func (cc *ChatroomController) GetChatrooms(c *gin.Context) {
 	}
 
 	// Convert to response format
-	var response []interface{}
+	var response []any
 	for _, chatroom := range chatrooms {
 		response = append(response, chatroom.ToResponse())
 	}
@@ -143,7 +150,7 @@ func (cc *ChatroomController) GetChatroomsByUserID(c *gin.Context) {
 	}
 
 	// Convert to response format
-	var response []interface{}
+	var response []any
 	for _, chatroom := range chatrooms {
 		response = append(response, chatroom.ToResponse())
 	}
@@ -254,6 +261,59 @@ func (cc *ChatroomController) JoinChatroom(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Joined chatroom successfully"})
+}
+
+// JoinChatroomByCode handles joining a chatroom using room code
+// @Summary Join a chatroom by room code
+// @Description Join a chatroom using its 6-character room code and optional password
+// @Tags chatrooms
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Param request body JoinChatroomByCodeRequest true "Room code and password"
+// @Success 200 {object} map[string]models.ChatroomResponse "Joined chatroom successfully"
+// @Failure 400 {object} map[string]string "Invalid request body"
+// @Failure 401 {object} map[string]string "User not authenticated"
+// @Failure 403 {object} map[string]string "Incorrect password"
+// @Failure 404 {object} map[string]string "Room not found"
+// @Failure 409 {object} map[string]string "User is already a member of this chatroom"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /chatrooms/join [post]
+func (cc *ChatroomController) JoinChatroomByCode(c *gin.Context) {
+	var req JoinChatroomByCodeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": utils.FormatValidationError(err)})
+		return
+	}
+
+	// Get user ID from context (set by auth middleware)
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+	username, _ := c.Get("username")
+
+	// Join chatroom using the service
+	chatroom, err := cc.ChatroomService.JoinChatroomByCode(req.RoomCode, req.Password, userID.(uint), username.(string))
+	if err != nil {
+		switch err.Error() {
+		case "room not found":
+			c.JSON(http.StatusNotFound, gin.H{"error": "Room not found. Please check the room code."})
+		case "incorrect password":
+			c.JSON(http.StatusForbidden, gin.H{"error": "Incorrect password"})
+		case "user is already a member of this chatroom":
+			c.JSON(http.StatusConflict, gin.H{"error": "You are already a member of this chatroom"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": utils.FormatServiceError(err)})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":  "Joined chatroom successfully",
+		"chatroom": chatroom.ToResponse(),
+	})
 }
 
 // DeleteChatroom handles deleting a chatroom

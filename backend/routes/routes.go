@@ -64,6 +64,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, mongodb *mongo.Database, logger *lo
 			protected.GET("/chatrooms/:id", chatroomController.GetChatroomByID)
 			protected.POST("/chatrooms", chatroomController.CreateChatroom)
 			protected.POST("/chatrooms/:id/join", chatroomController.JoinChatroom)
+			protected.POST("/chatrooms/join", chatroomController.JoinChatroomByCode)
 			protected.DELETE("/chatrooms/:id", chatroomController.DeleteChatroom)
 
 			// Message routes

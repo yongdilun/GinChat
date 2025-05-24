@@ -154,15 +154,37 @@ GinChat/
 
 ## Features
 - User authentication (register, login, logout)
-- Create and join chat rooms
+- Create and join chat rooms with room codes
+- Optional password protection for chatrooms
 - Real-time messaging
 - Message types: text, images, audio, video
+- Message editing and deletion
 - Media viewing and downloading
 - Collapsible sidebar for better space utilization
 - Interactive empty states with helpful guidance
 - Online status indicators
 - User profiles with avatars
 - Smooth animations and transitions
+
+## Room Management
+
+### Creating Chatrooms
+- **Room Names**: Each chatroom has a unique name
+- **Room Codes**: Automatically generated 6-character codes (e.g., "ABC123")
+- **Optional Passwords**: Creators can set passwords for private rooms
+- **Auto-Join**: Creators are automatically added as the first member
+
+### Joining Chatrooms
+- **By Room Code**: Use the 6-character room code to find and join rooms
+- **Password Protection**: Enter password if the room is protected
+- **Search First**: Frontend searches for the room, then prompts for password if needed
+- **Duplicate Prevention**: Users cannot join the same room twice
+
+### Room Code System
+- **Format**: 6 characters using A-Z and 0-9 (e.g., "XYZ789")
+- **Uniqueness**: Each room code is guaranteed to be unique
+- **Case Insensitive**: Room codes work regardless of case
+- **Easy Sharing**: Share room codes with friends to invite them
 
 ## WebSocket Implementation
 
@@ -192,6 +214,37 @@ GinChat uses a bidirectional WebSocket communication layer to enable real-time m
 ## API Documentation
 API documentation is available at `/swagger/index.html` when the backend server is running.
 
+### Key API Endpoints
+
+#### Chatroom Management
+- `POST /api/chatrooms` - Create a new chatroom with optional password
+- `GET /api/chatrooms` - Get all available chatrooms
+- `GET /api/chatrooms/user` - Get user's joined chatrooms
+- `GET /api/chatrooms/:id` - Get specific chatroom details
+- `POST /api/chatrooms/join` - Join chatroom by room code and password
+- `POST /api/chatrooms/:id/join` - Join chatroom by ID (legacy)
+- `DELETE /api/chatrooms/:id` - Delete chatroom (creator only)
+
+#### Request Examples
+
+**Create Chatroom:**
+```json
+POST /api/chatrooms
+{
+  "name": "My Private Room",
+  "password": "secret123"  // Optional
+}
+```
+
+**Join by Room Code:**
+```json
+POST /api/chatrooms/join
+{
+  "room_code": "ABC123",
+  "password": "secret123"  // Required if room has password
+}
+```
+
 ## Data Models
 
 ### User Table
@@ -213,6 +266,9 @@ API documentation is available at `/swagger/index.html` when the backend server 
 ### Chatroom (MongoDB)
 - id: ObjectID (Primary Key)
 - name: String (Unique)
+- room_code: String (Unique, 6 characters)
+- password: String (Optional, not returned in API responses)
+- has_password: Boolean (Indicates if room is password protected)
 - created_by: Integer (User ID)
 - created_at: DateTime
 - members: Array of ChatroomMember objects
@@ -227,9 +283,11 @@ API documentation is available at `/swagger/index.html` when the backend server 
 - chatroom_id: ObjectID (Reference to Chatroom)
 - sender_id: Integer (User ID)
 - sender_name: String
-- message_type: String (text, picture, audio, video, etc.)
+- message_type: String (text, picture, audio, video, text_and_picture, text_and_audio, text_and_video)
 - text_content: String (Optional)
 - media_url: String (Optional)
+- edited: Boolean (Indicates if message was edited)
+- edited_at: DateTime (Timestamp of last edit)
 - sent_at: DateTime
 
 ## Security

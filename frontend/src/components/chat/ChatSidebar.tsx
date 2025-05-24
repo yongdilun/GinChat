@@ -56,8 +56,14 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
   const [showCreateChatroom, setShowCreateChatroom] = useState(false);
   const [showJoinChatroom, setShowJoinChatroom] = useState(false);
   const [newChatroomName, setNewChatroomName] = useState('');
+  const [newChatroomPassword, setNewChatroomPassword] = useState('');
+  const [roomCode, setRoomCode] = useState('');
+  const [roomPassword, setRoomPassword] = useState('');
+  const [foundRoom, setFoundRoom] = useState<Chatroom | null>(null);
+  const [showPasswordInput, setShowPasswordInput] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const [joiningChatroomId, setJoiningChatroomId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [availableChatrooms, setAvailableChatrooms] = useState<Chatroom[]>([]);
@@ -95,13 +101,17 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
     setError('');
 
     try {
-      const response = await chatroomAPI.createChatroom(newChatroomName);
+      const response = await chatroomAPI.createChatroom(
+        newChatroomName,
+        newChatroomPassword.trim() || undefined
+      );
 
       // Get the newly created chatroom
       const newChatroom = response.data.chatroom;
 
       // Clear input and hide forms
       setNewChatroomName('');
+      setNewChatroomPassword('');
       setShowCreateChatroom(false);
       setShowChatroomOptions(false);
 
@@ -150,6 +160,99 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
     } finally {
       setIsJoining(false);
       setJoiningChatroomId(null);
+    }
+  };
+
+  // Search for room by code
+  const searchRoomByCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!roomCode.trim()) return;
+
+    setIsSearching(true);
+    setError('');
+    setFoundRoom(null);
+    setShowPasswordInput(false);
+
+    try {
+      // Try to get room info by attempting to join without password first
+      // This will tell us if the room exists and if it needs a password
+      const response = await chatroomAPI.joinChatroomByCode(roomCode.toUpperCase(), '');
+
+      // If successful, room doesn't need password
+      const joinedChatroom = response.data.chatroom;
+
+      // Clear forms and refresh
+      setRoomCode('');
+      setRoomPassword('');
+      setShowJoinChatroom(false);
+      setShowChatroomOptions(false);
+
+      await onChatroomsRefresh();
+
+      if (joinedChatroom) {
+        console.log("Automatically selecting joined chatroom:", joinedChatroom.name);
+        onSelectChatroom(joinedChatroom);
+      }
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { error?: string } } };
+
+      if (error.response?.data?.error === 'Incorrect password') {
+        // Room exists but needs password
+        setShowPasswordInput(true);
+        setError('This room is password protected. Please enter the password.');
+      } else if (error.response?.data?.error === 'Room not found. Please check the room code.') {
+        setError('Room not found. Please check the room code.');
+      } else if (error.response?.data?.error === 'You are already a member of this chatroom') {
+        setError('You are already a member of this chatroom.');
+      } else {
+        setError(error.response?.data?.error || 'Failed to find room');
+      }
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Join room with password
+  const joinRoomWithPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!roomCode.trim()) return;
+
+    setIsJoining(true);
+    setError('');
+
+    try {
+      const response = await chatroomAPI.joinChatroomByCode(
+        roomCode.toUpperCase(),
+        roomPassword
+      );
+
+      const joinedChatroom = response.data.chatroom;
+
+      // Clear forms and refresh
+      setRoomCode('');
+      setRoomPassword('');
+      setShowPasswordInput(false);
+      setShowJoinChatroom(false);
+      setShowChatroomOptions(false);
+
+      await onChatroomsRefresh();
+
+      if (joinedChatroom) {
+        console.log("Automatically selecting joined chatroom:", joinedChatroom.name);
+        onSelectChatroom(joinedChatroom);
+      }
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { error?: string } } };
+
+      if (error.response?.data?.error === 'Incorrect password') {
+        setError('Incorrect password. Please try again.');
+      } else {
+        setError(error.response?.data?.error || 'Failed to join room');
+      }
+    } finally {
+      setIsJoining(false);
     }
   };
 
@@ -304,6 +407,9 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                 setShowCreateChatroom(false);
                 setShowChatroomOptions(false);
                 setError('');
+                setRoomCode('');
+                setRoomPassword('');
+                setShowPasswordInput(false);
               }}
               className="w-full px-3 py-2 flex items-center text-sm text-white bg-green-500 rounded-md hover:bg-green-600 transition-colors"
               whileHover={{ scale: 1.03 }}
@@ -312,7 +418,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
               id="join-chatroom-button"
             >
               <UserGroupIcon className="w-4 h-4 mr-2" />
-              Join Existing Chatroom
+              Join by Room Code
             </motion.button>
           </motion.div>
         )}
@@ -342,13 +448,26 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
             {error && (
               <div className="mb-2 text-sm text-red-600">{error}</div>
             )}
-            <input
-              type="text"
-              value={newChatroomName}
-              onChange={(e) => setNewChatroomName(e.target.value)}
-              placeholder="Chatroom name"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
+            <div className="space-y-2">
+              <input
+                type="text"
+                value={newChatroomName}
+                onChange={(e) => setNewChatroomName(e.target.value)}
+                placeholder="Chatroom name"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                required
+              />
+              <input
+                type="password"
+                value={newChatroomPassword}
+                onChange={(e) => setNewChatroomPassword(e.target.value)}
+                placeholder="Password (optional)"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Leave password empty for a public room
+              </p>
+            </div>
             <motion.button
               type="submit"
               disabled={isCreating}
@@ -381,71 +500,108 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
             transition={{ duration: 0.2 }}
           >
             <div className="flex justify-between items-center mb-2">
-              <h3 className="text-sm font-medium">Join Existing Chatroom</h3>
+              <h3 className="text-sm font-medium">Join by Room Code</h3>
               <button
-                onClick={() => setShowJoinChatroom(false)}
+                onClick={() => {
+                  setShowJoinChatroom(false);
+                  setRoomCode('');
+                  setRoomPassword('');
+                  setShowPasswordInput(false);
+                  setError('');
+                }}
                 className="text-gray-500 hover:text-gray-700"
               >
                 <XIcon className="w-5 h-5" />
               </button>
             </div>
+
             {error && (
               <div className="mb-2 text-sm text-red-600">{error}</div>
             )}
-            {availableChatrooms.length > 0 ? (
-              <motion.ul
-                className="border border-gray-200 dark:border-gray-600 rounded-md overflow-hidden"
-                initial="hidden"
-                animate="visible"
-                variants={{
-                  hidden: { opacity: 0 },
-                  visible: {
-                    opacity: 1,
-                    transition: {
-                      staggerChildren: 0.1
-                    }
-                  }
-                }}
-              >
-                {availableChatrooms.map((chatroom) => (
-                  <motion.li
-                    key={chatroom.id}
-                    className="border-b border-gray-200 dark:border-gray-600 last:border-b-0"
-                    variants={{
-                      hidden: { opacity: 0, y: 10 },
-                      visible: { opacity: 1, y: 0 }
-                    }}
-                  >
-                    <div className="flex justify-between items-center p-3 hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <div>
-                        <p className="text-sm font-medium">{chatroom.name}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {chatroom.members.length} member{chatroom.members.length !== 1 ? 's' : ''}
-                        </p>
-                      </div>
-                      <motion.button
-                        onClick={() => joinChatroom(chatroom.id)}
-                        disabled={isJoining}
-                        className="px-2 py-1 text-xs text-white bg-green-500 rounded hover:bg-green-600 disabled:opacity-50"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                      >
-                        {isJoining && joiningChatroomId === chatroom.id ? (
-                          <span className="flex items-center">
-                            <svg className="animate-spin -ml-1 mr-1 h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            Join
-                          </span>
-                        ) : 'Join'}
-                      </motion.button>
-                    </div>
-                  </motion.li>
-                ))}
-              </motion.ul>
+
+            {!showPasswordInput ? (
+              // Step 1: Enter room code
+              <form onSubmit={searchRoomByCode} className="space-y-2">
+                <input
+                  type="text"
+                  value={roomCode}
+                  onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+                  placeholder="Enter room code (e.g., ABC123)"
+                  maxLength={6}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono"
+                  required
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Enter the 6-character room code
+                </p>
+                <motion.button
+                  type="submit"
+                  disabled={isSearching || roomCode.length !== 6}
+                  className="w-full px-3 py-2 flex items-center justify-center text-sm text-white bg-green-500 rounded-md hover:bg-green-600 disabled:opacity-50"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                >
+                  {isSearching ? (
+                    <span className="flex items-center justify-center">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Searching...
+                    </span>
+                  ) : 'Find Room'}
+                </motion.button>
+              </form>
             ) : (
-              <p className="text-sm text-gray-500 dark:text-gray-400">No available chatrooms to join.</p>
+              // Step 2: Enter password
+              <form onSubmit={joinRoomWithPassword} className="space-y-2">
+                <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+                  <p className="text-xs text-blue-600 dark:text-blue-400">
+                    Room Code: <span className="font-mono font-bold">{roomCode}</span>
+                  </p>
+                </div>
+                <input
+                  type="password"
+                  value={roomPassword}
+                  onChange={(e) => setRoomPassword(e.target.value)}
+                  placeholder="Enter room password"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  required
+                  autoFocus
+                />
+                <div className="flex space-x-2">
+                  <motion.button
+                    type="submit"
+                    disabled={isJoining}
+                    className="flex-1 px-3 py-2 flex items-center justify-center text-sm text-white bg-green-500 rounded-md hover:bg-green-600 disabled:opacity-50"
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                  >
+                    {isJoining ? (
+                      <span className="flex items-center justify-center">
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Joining...
+                      </span>
+                    ) : 'Join Room'}
+                  </motion.button>
+                  <motion.button
+                    type="button"
+                    onClick={() => {
+                      setShowPasswordInput(false);
+                      setRoomPassword('');
+                      setError('');
+                    }}
+                    className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400 bg-gray-200 dark:bg-gray-600 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500"
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                  >
+                    Back
+                  </motion.button>
+                </div>
+              </form>
             )}
           </motion.div>
         )}
@@ -498,12 +654,24 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                         </div>
                         {!isSidebarCollapsed && (
                           <div className="overflow-hidden flex-1">
-                            <p className={`font-medium truncate ${
-                              selectedChatroom?.id === chatroom.id ? 'text-primary-600 dark:text-primary-400' : ''
-                            }`}>{chatroom.name}</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                              {chatroom.members.length} member{chatroom.members.length !== 1 ? 's' : ''}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className={`font-medium truncate ${
+                                selectedChatroom?.id === chatroom.id ? 'text-primary-600 dark:text-primary-400' : ''
+                              }`}>{chatroom.name}</p>
+                              {chatroom.has_password && (
+                                <svg className="w-3 h-3 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                {chatroom.members.length} member{chatroom.members.length !== 1 ? 's' : ''}
+                              </p>
+                              <p className="text-xs text-gray-400 dark:text-gray-500 font-mono">
+                                {chatroom.room_code}
+                              </p>
+                            </div>
                           </div>
                         )}
                       </motion.button>

@@ -35,6 +35,8 @@ export interface ChatroomMember {
 export interface Chatroom {
   id: string;
   name: string;
+  room_code: string;
+  has_password: boolean;
   created_by: number;
   created_at: string;
   members: ChatroomMember[];
@@ -42,6 +44,12 @@ export interface Chatroom {
 
 export interface CreateChatroomRequest {
   name: string;
+  password?: string;
+}
+
+export interface JoinChatroomByCodeRequest {
+  room_code: string;
+  password?: string;
 }
 
 export interface ChatroomResponse {

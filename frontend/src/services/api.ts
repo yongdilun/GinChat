@@ -110,14 +110,17 @@ export const chatroomAPI = {
   getChatrooms: () => {
     return api.get('/api/chatrooms');
   },
-  createChatroom: (name: string) => {
-    return api.post('/api/chatrooms', { name });
+  createChatroom: (name: string, password?: string) => {
+    return api.post('/api/chatrooms', { name, password });
   },
   getChatroomById: (chatroomId: string) => {
     return api.get(`/api/chatrooms/${chatroomId}`);
   },
   joinChatroom: (chatroomId: string) => {
     return api.post(`/api/chatrooms/${chatroomId}/join`);
+  },
+  joinChatroomByCode: (roomCode: string, password?: string) => {
+    return api.post('/api/chatrooms/join', { room_code: roomCode, password });
   },
   deleteChatroom: (chatroomId: string) => {
     return api.delete(`/api/chatrooms/${chatroomId}`);

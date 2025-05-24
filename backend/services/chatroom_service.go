@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"math/rand"
 	"time"
 
 	"github.com/ginchat/models"
@@ -26,8 +27,35 @@ func NewChatroomService(mongodb *mongo.Database) *ChatroomService {
 	}
 }
 
+// generateRoomCode generates a unique 6-character room code
+func (s *ChatroomService) generateRoomCode() (string, error) {
+	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	const codeLength = 6
+
+	for attempts := 0; attempts < 10; attempts++ {
+		// Generate random code
+		code := make([]byte, codeLength)
+		for i := range code {
+			code[i] = charset[rand.Intn(len(charset))]
+		}
+		roomCode := string(code)
+
+		// Check if code already exists
+		count, err := s.ChatColl.CountDocuments(context.Background(), bson.M{"room_code": roomCode})
+		if err != nil {
+			return "", err
+		}
+
+		if count == 0 {
+			return roomCode, nil
+		}
+	}
+
+	return "", errors.New("failed to generate unique room code after 10 attempts")
+}
+
 // CreateChatroom creates a new chatroom
-func (s *ChatroomService) CreateChatroom(name string, userID uint, username string) (*models.Chatroom, error) {
+func (s *ChatroomService) CreateChatroom(name string, userID uint, username string, password string) (*models.Chatroom, error) {
 	// Check if chatroom with the same name already exists
 	count, err := s.ChatColl.CountDocuments(context.Background(), bson.M{"name": name}, options.Count())
 	if err != nil {
@@ -37,10 +65,17 @@ func (s *ChatroomService) CreateChatroom(name string, userID uint, username stri
 		return nil, errors.New("chatroom with this name already exists")
 	}
 
+	// Generate unique room code
+	roomCode, err := s.generateRoomCode()
+	if err != nil {
+		return nil, errors.New("failed to generate room code")
+	}
+
 	// Create new chatroom
 	chatroom := models.Chatroom{
 		ID:        primitive.NewObjectID(),
 		Name:      name,
+		RoomCode:  roomCode,
 		CreatedBy: userID,
 		CreatedAt: time.Now(),
 		Members: []models.ChatroomMember{
@@ -50,6 +85,12 @@ func (s *ChatroomService) CreateChatroom(name string, userID uint, username stri
 				JoinedAt: time.Now(),
 			},
 		},
+	}
+
+	// Set password if provided
+	err = chatroom.SetPassword(password)
+	if err != nil {
+		return nil, errors.New("failed to set password")
 	}
 
 	// Save chatroom to MongoDB
@@ -111,7 +152,17 @@ func (s *ChatroomService) GetChatroomByID(chatroomID primitive.ObjectID) (*model
 	return &chatroom, nil
 }
 
-// JoinChatroom adds a user to a chatroom
+// GetChatroomByRoomCode retrieves a chatroom by room code
+func (s *ChatroomService) GetChatroomByRoomCode(roomCode string) (*models.Chatroom, error) {
+	var chatroom models.Chatroom
+	err := s.ChatColl.FindOne(context.Background(), bson.M{"room_code": roomCode}).Decode(&chatroom)
+	if err != nil {
+		return nil, errors.New("chatroom not found")
+	}
+	return &chatroom, nil
+}
+
+// JoinChatroom adds a user to a chatroom (legacy method using ID)
 func (s *ChatroomService) JoinChatroom(chatroomID primitive.ObjectID, userID uint, username string) error {
 	// Check if chatroom exists
 	chatroom, err := s.GetChatroomByID(chatroomID)
@@ -145,6 +196,48 @@ func (s *ChatroomService) JoinChatroom(chatroomID primitive.ObjectID, userID uin
 	}
 
 	return nil
+}
+
+// JoinChatroomByCode adds a user to a chatroom using room code and password
+func (s *ChatroomService) JoinChatroomByCode(roomCode string, password string, userID uint, username string) (*models.Chatroom, error) {
+	// Find chatroom by room code
+	chatroom, err := s.GetChatroomByRoomCode(roomCode)
+	if err != nil {
+		return nil, errors.New("room not found")
+	}
+
+	// Check password if required
+	if !chatroom.CheckPassword(password) {
+		return nil, errors.New("incorrect password")
+	}
+
+	// Check if user is already a member
+	for _, member := range chatroom.Members {
+		if member.UserID == userID {
+			return nil, errors.New("user is already a member of this chatroom")
+		}
+	}
+
+	// Add user to chatroom members
+	_, err = s.ChatColl.UpdateOne(
+		context.Background(),
+		bson.M{"_id": chatroom.ID},
+		bson.M{
+			"$push": bson.M{
+				"members": models.ChatroomMember{
+					UserID:   userID,
+					Username: username,
+					JoinedAt: time.Now(),
+				},
+			},
+		},
+	)
+	if err != nil {
+		return nil, errors.New("failed to join chatroom")
+	}
+
+	// Return updated chatroom
+	return s.GetChatroomByID(chatroom.ID)
 }
 
 // LeaveChatroom removes a user from a chatroom
