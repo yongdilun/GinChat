@@ -119,8 +119,8 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
   };
 
   // Helper function to format latest message text
-  const formatLatestMessage = (message: LatestChatMessage) => {
-    if (!message.message_id) return 'No messages yet';
+  const formatLatestMessage = (message: LatestChatMessage | null) => {
+    if (!message || !message.message_id) return 'No messages yet';
 
     if (message.message_type === 'text') {
       return message.text_content || '';
@@ -130,7 +130,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
       return '🎵 Audio';
     } else if (message.message_type === 'video') {
       return '🎥 Video';
-    } else if (message.message_type.includes('text_and_')) {
+    } else if (message.message_type && message.message_type.includes('text_and_')) {
       const mediaType = message.message_type.split('_and_')[1];
       const mediaIcon = mediaType === 'picture' ? '📷' : mediaType === 'audio' ? '🎵' : '🎥';
       return `${mediaIcon} ${message.text_content || 'Media with text'}`;
@@ -673,8 +673,8 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                             {chatroom.name.charAt(0).toUpperCase()}
                           </div>
                           {isSidebarCollapsed && getUnreadCountForChatroom(chatroom.id) > 0 && (
-                            <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                              {getUnreadCountForChatroom(chatroom.id) > 9 ? '9+' : getUnreadCountForChatroom(chatroom.id)}
+                            <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold shadow-lg animate-pulse border-2 border-white">
+                              {getUnreadCountForChatroom(chatroom.id) > 99 ? '99+' : getUnreadCountForChatroom(chatroom.id)}
                             </div>
                           )}
                         </div>
@@ -692,8 +692,8 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                                 )}
                               </div>
                               {getUnreadCountForChatroom(chatroom.id) > 0 && (
-                                <div className="bg-red-500 text-white text-xs rounded-full px-2 py-0.5 min-w-[20px] text-center flex-shrink-0">
-                                  {getUnreadCountForChatroom(chatroom.id)}
+                                <div className="bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-[24px] h-6 flex items-center justify-center font-bold shadow-lg animate-pulse">
+                                  {getUnreadCountForChatroom(chatroom.id) > 99 ? '99+' : getUnreadCountForChatroom(chatroom.id)}
                                 </div>
                               )}
                             </div>
@@ -703,7 +703,9 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                                   const latestMessage = getLatestMessageForChatroom(chatroom.id);
                                   if (latestMessage) {
                                     const formattedMessage = formatLatestMessage(latestMessage);
-                                    return formattedMessage.length > 30 ? `${formattedMessage.substring(0, 30)}...` : formattedMessage;
+                                    if (formattedMessage && typeof formattedMessage === 'string') {
+                                      return formattedMessage.length > 30 ? `${formattedMessage.substring(0, 30)}...` : formattedMessage;
+                                    }
                                   }
                                   return 'No messages yet';
                                 })()}

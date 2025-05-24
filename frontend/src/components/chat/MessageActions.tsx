@@ -77,8 +77,11 @@ const MessageActions: React.FC<MessageActionsProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Only show actions for the message sender
-  if (!user || message.sender_id !== user.user_id) {
+  // Check if user is the sender
+  const isMessageSender = user && message.sender_id === user.user_id;
+
+  // If no user, don't show any actions
+  if (!user) {
     return null;
   }
 
@@ -176,7 +179,7 @@ const MessageActions: React.FC<MessageActionsProps> = ({
     }
   };
 
-  if (isEditing) {
+  if (isEditing && isMessageSender) {
     return (
       <motion.div
         className="mt-2 space-y-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
@@ -308,20 +311,22 @@ const MessageActions: React.FC<MessageActionsProps> = ({
 
   return (
     <>
-      {/* Simple Always-Visible Action Buttons */}
+      {/* Action Buttons */}
       <div className="flex items-center space-x-1">
-        {/* Edit Button */}
-        <motion.button
-          onClick={handleStartEdit}
-          className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-colors duration-200"
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          title="Edit message"
-        >
-          <EditIcon className="w-3.5 h-3.5" />
-        </motion.button>
+        {/* Edit Button - Only for sender */}
+        {isMessageSender && (
+          <motion.button
+            onClick={handleStartEdit}
+            className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-colors duration-200"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            title="Edit message"
+          >
+            <EditIcon className="w-3.5 h-3.5" />
+          </motion.button>
+        )}
 
-        {/* Info Button - Read Status */}
+        {/* Info Button - Read Status - Available for everyone */}
         <motion.button
           onClick={handleShowReadStatus}
           className="p-1.5 text-gray-400 hover:text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-full transition-colors duration-200"
@@ -332,16 +337,18 @@ const MessageActions: React.FC<MessageActionsProps> = ({
           <InfoIcon className="w-3.5 h-3.5" />
         </motion.button>
 
-        {/* Delete Button */}
-        <motion.button
-          onClick={() => setShowDeleteConfirm(true)}
-          className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors duration-200"
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          title="Delete message"
-        >
-          <DeleteIcon className="w-3.5 h-3.5" />
-        </motion.button>
+        {/* Delete Button - Only for sender */}
+        {isMessageSender && (
+          <motion.button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors duration-200"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            title="Delete message"
+          >
+            <DeleteIcon className="w-3.5 h-3.5" />
+          </motion.button>
+        )}
       </div>
 
       {/* Delete Confirmation Modal */}
