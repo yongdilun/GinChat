@@ -426,12 +426,27 @@ function ChatPageContent() {
 
   // Handle message read status update from WebSocket
   const handleMessageReadStatusUpdate = useCallback((messageId: string, readStatus: ReadInfo[]) => {
-    console.log('Updating read status for message:', messageId, readStatus);
-    setMessages(prevMessages =>
-      prevMessages.map(msg =>
-        msg.id === messageId ? { ...msg, read_status: readStatus } : msg
-      )
-    );
+    console.log('🔄 Updating read status for message:', messageId);
+    console.log('📊 New read status:', readStatus);
+
+    setMessages(prevMessages => {
+      const updatedMessages = prevMessages.map(msg => {
+        if (msg.id === messageId) {
+          const updatedMsg = { ...msg, read_status: readStatus };
+          console.log('✅ Updated message:', updatedMsg.id, 'Read status:', updatedMsg.read_status);
+
+          // Check if all users have read the message
+          const allRead = readStatus.length > 0 && readStatus.every(status => status.is_read);
+          console.log(`🎨 Tick color should be: ${allRead ? 'BLUE' : 'GREY'}`);
+
+          return updatedMsg;
+        }
+        return msg;
+      });
+
+      console.log('📝 Messages state updated, triggering re-render');
+      return updatedMessages;
+    });
   }, []);
 
   // Handle refresh messages from WebSocket
@@ -557,6 +572,7 @@ function ChatPageContent() {
           {/* Messages */}
               <div className="flex-1 overflow-hidden">
             <MessageList
+              key={`${selectedChatroom?.id}-${messages.length}`}
               user={user}
               selectedChatroom={selectedChatroom}
               messages={messages}

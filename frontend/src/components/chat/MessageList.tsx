@@ -177,6 +177,21 @@ const MessageList: React.FC<MessageListProps> = ({
     setFirstUnreadMessageId(null);
   }, [selectedChatroom?.id]);
 
+  // Monitor messages changes for debugging
+  useEffect(() => {
+    console.log('📝 Messages prop changed, total messages:', messages.length);
+    messages.forEach(msg => {
+      if (msg.sender_id === user?.user_id && msg.read_status) {
+        const allRead = msg.read_status.every(status => status.is_read);
+        console.log(`📊 Message ${msg.id} read status:`, {
+          readStatus: msg.read_status,
+          allRead,
+          expectedTickColor: allRead ? 'BLUE' : 'GREY'
+        });
+      }
+    });
+  }, [messages, user?.user_id]);
+
   // Extract filename from URL
   const getFilenameFromUrl = (url: string) => {
     // Get the filename from the URL path
@@ -523,27 +538,42 @@ const MessageList: React.FC<MessageListProps> = ({
                     {/* Simple read status ticks - only show for sender's messages */}
                     {message.sender_id === user?.user_id && (
                       <div className="flex items-center ml-1">
-                        {message.read_status && message.read_status.length > 0 && message.read_status.every(status => status.is_read) ? (
-                          // All read - blue double tick
-                          <div className="flex items-center text-blue-500" title="Read">
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                            <svg className="w-4 h-4 -ml-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                          </div>
-                        ) : (
-                          // Not read - gray double tick
-                          <div className="flex items-center text-gray-400" title="Delivered">
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                            <svg className="w-4 h-4 -ml-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                          </div>
-                        )}
+                        {(() => {
+                          // Debug logging for tick rendering
+                          const readStatus = message.read_status || [];
+                          const allRead = readStatus.length > 0 && readStatus.every(status => status.is_read);
+                          console.log(`🎨 Rendering ticks for message ${message.id}:`, {
+                            readStatus,
+                            allRead,
+                            tickColor: allRead ? 'BLUE' : 'GREY'
+                          });
+
+                          if (allRead) {
+                            // All read - blue double tick
+                            return (
+                              <div className="flex items-center text-blue-500" title="Read">
+                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                                <svg className="w-4 h-4 -ml-1" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                            );
+                          } else {
+                            // Not read - gray double tick
+                            return (
+                              <div className="flex items-center text-gray-400" title="Delivered">
+                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                                <svg className="w-4 h-4 -ml-1" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                            );
+                          }
+                        })()}
                       </div>
                     )}
                   </div>
