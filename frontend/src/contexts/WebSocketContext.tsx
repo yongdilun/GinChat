@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { useAuth } from './AuthContext';
 
 interface WebSocketMessage {
   type: string;
@@ -29,7 +28,6 @@ interface WebSocketProviderProps {
 }
 
 export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }) => {
-  const { user, token } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('disconnected');
@@ -38,7 +36,31 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
 
+  // Helper to check if we're in browser environment
+  const isBrowser = typeof window !== 'undefined';
+
+  // Get user and token from localStorage
+  const getAuthData = () => {
+    if (!isBrowser) return { user: null, token: null };
+
+    const token = localStorage.getItem('token');
+    const userStr = localStorage.getItem('user');
+    let user = null;
+
+    if (userStr) {
+      try {
+        user = JSON.parse(userStr);
+      } catch (error) {
+        console.error('Failed to parse user data:', error);
+      }
+    }
+
+    return { user, token };
+  };
+
   const connect = () => {
+    const { user, token } = getAuthData();
+
     if (!user || !token) {
       console.log('No user or token available for WebSocket connection');
       return;
@@ -53,7 +75,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     console.log('Connecting to WebSocket...');
 
     // Create WebSocket connection with user_id as query parameter
-    const wsUrl = `ws://localhost:8080/ws?user_id=${user.id}`;
+    const wsUrl = `ws://localhost:8080/ws?user_id=${user.user_id}`;
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
@@ -80,10 +102,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
       wsRef.current = null;
 
       // Attempt to reconnect if not a normal closure and user is still authenticated
-      if (event.code !== 1000 && user && token && reconnectAttempts.current < maxReconnectAttempts) {
+      const { user: currentUser, token: currentToken } = getAuthData();
+      if (event.code !== 1000 && currentUser && currentToken && reconnectAttempts.current < maxReconnectAttempts) {
         const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000); // Exponential backoff, max 30s
         console.log(`Attempting to reconnect in ${delay}ms (attempt ${reconnectAttempts.current + 1}/${maxReconnectAttempts})`);
-        
+
         reconnectTimeoutRef.current = setTimeout(() => {
           reconnectAttempts.current++;
           connect();
@@ -123,19 +146,35 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     }
   };
 
-  // Connect when user is authenticated
+  // Connect when component mounts and check auth status
   useEffect(() => {
+    const { user, token } = getAuthData();
     if (user && token) {
       connect();
     } else {
       disconnect();
     }
 
+    // Set up interval to check auth status periodically
+    const authCheckInterval = setInterval(() => {
+      const { user: currentUser, token: currentToken } = getAuthData();
+      const isCurrentlyConnected = wsRef.current?.readyState === WebSocket.OPEN;
+
+      if (currentUser && currentToken && !isCurrentlyConnected) {
+        // User is authenticated but not connected, try to connect
+        connect();
+      } else if ((!currentUser || !currentToken) && isCurrentlyConnected) {
+        // User is not authenticated but still connected, disconnect
+        disconnect();
+      }
+    }, 5000); // Check every 5 seconds
+
     // Cleanup on unmount
     return () => {
+      clearInterval(authCheckInterval);
       disconnect();
     };
-  }, [user, token]);
+  }, []); // Empty dependency array since we check auth status inside
 
   // Ping to keep connection alive
   useEffect(() => {

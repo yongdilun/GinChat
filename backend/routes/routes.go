@@ -93,6 +93,9 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, mongodb *mongo.Database, logger *lo
 		}
 		// WebSocket route OUTSIDE protected group
 		api.GET("/ws", websocketController.HandleConnection)
+
+		// Simple WebSocket route for user_id based connections
+		r.GET("/ws", websocketController.HandleConnection)
 	}
 
 	// Debug route for WebSocket connection
