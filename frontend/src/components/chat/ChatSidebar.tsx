@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { User, Chatroom, LatestChatMessage, ChatroomUnreadCount } from '@/types';
 import { chatroomAPI, messageReadStatusAPI } from '@/services/api';
@@ -81,7 +81,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
   }, [chatrooms, user]);
 
   // Fetch latest messages and unread counts
-  const fetchLatestMessagesAndCounts = async () => {
+  const fetchLatestMessagesAndCounts = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -95,12 +95,12 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
     } catch (error) {
       console.error('Failed to fetch latest messages and unread counts:', error);
     }
-  };
+  }, [user]);
 
   // Fetch latest messages and unread counts when chatrooms change
   useEffect(() => {
     fetchLatestMessagesAndCounts();
-  }, [chatrooms, user]);
+  }, [chatrooms, user, fetchLatestMessagesAndCounts]);
 
   // Helper function to get latest message for a chatroom
   const getLatestMessageForChatroom = (chatroomId: string) => {

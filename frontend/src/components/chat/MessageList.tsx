@@ -40,7 +40,6 @@ const MessageList: React.FC<MessageListProps> = ({
   onDeleteMessage
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [hasNavigatedToUnread, setHasNavigatedToUnread] = useState(false);

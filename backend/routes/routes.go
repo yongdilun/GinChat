@@ -83,10 +83,10 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, mongodb *mongo.Database, logger *lo
 			protected.GET("/messages/latest", messageReadStatusController.GetLatestMessagesForChatrooms)
 			protected.GET("/messages/:message_id/read-status", messageReadStatusController.GetMessageReadStatus)
 			protected.GET("/messages/:message_id/read-by-who", messageReadStatusController.GetMessageReadByWho)
-			protected.GET("/chatrooms/:chatroom_id/last-read", messageReadStatusController.GetUserLastReadForChatroom)
-			protected.POST("/chatrooms/:chatroom_id/mark-all-read", messageReadStatusController.MarkAllMessagesInChatroomAsRead)
-			protected.GET("/chatrooms/:chatroom_id/first-unread", messageReadStatusController.GetFirstUnreadMessageInChatroom)
-			protected.GET("/chatrooms/:chatroom_id/unread-count", messageReadStatusController.GetUnreadCountForChatroom)
+			protected.GET("/chatrooms/:id/last-read", messageReadStatusController.GetUserLastReadForChatroom)
+			protected.POST("/chatrooms/:id/mark-all-read", messageReadStatusController.MarkAllMessagesInChatroomAsRead)
+			protected.GET("/chatrooms/:id/first-unread", messageReadStatusController.GetFirstUnreadMessageInChatroom)
+			protected.GET("/chatrooms/:id/unread-count", messageReadStatusController.GetUnreadCountForChatroom)
 
 			// Media routes
 			protected.POST("/media/upload", mediaController.UploadMedia)

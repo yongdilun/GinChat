@@ -81,16 +81,16 @@ func (c *MessageReadStatusController) MarkMessageAsRead(ctx *gin.Context) {
 // @Tags message-read-status
 // @Produce json
 // @Security ApiKeyAuth
-// @Param chatroom_id path string true "Chatroom ID"
+// @Param id path string true "Chatroom ID"
 // @Success 200 {object} models.UserLastReadResponse "User's last read message information"
 // @Failure 400 {object} map[string]string "Invalid chatroom ID"
 // @Failure 401 {object} map[string]string "User not authenticated"
 // @Failure 404 {object} map[string]string "No read history found"
 // @Failure 500 {object} map[string]string "Internal server error"
-// @Router /chatrooms/{chatroom_id}/last-read [get]
+// @Router /chatrooms/{id}/last-read [get]
 func (c *MessageReadStatusController) GetUserLastReadForChatroom(ctx *gin.Context) {
 	// Get chatroom ID from URL parameter
-	chatroomIDStr := ctx.Param("chatroom_id")
+	chatroomIDStr := ctx.Param("id")
 	chatroomID, err := primitive.ObjectIDFromHex(chatroomIDStr)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chatroom ID"})
@@ -319,15 +319,15 @@ func (c *MessageReadStatusController) GetMessageReadByWho(ctx *gin.Context) {
 // @Tags message-read-status
 // @Produce json
 // @Security ApiKeyAuth
-// @Param chatroom_id path string true "Chatroom ID"
+// @Param id path string true "Chatroom ID"
 // @Success 200 {object} map[string]string "All messages marked as read successfully"
 // @Failure 400 {object} map[string]string "Invalid chatroom ID"
 // @Failure 401 {object} map[string]string "User not authenticated"
 // @Failure 500 {object} map[string]string "Internal server error"
-// @Router /chatrooms/{chatroom_id}/mark-all-read [post]
+// @Router /chatrooms/{id}/mark-all-read [post]
 func (c *MessageReadStatusController) MarkAllMessagesInChatroomAsRead(ctx *gin.Context) {
 	// Get chatroom ID from URL parameter
-	chatroomIDStr := ctx.Param("chatroom_id")
+	chatroomIDStr := ctx.Param("id")
 	chatroomID, err := primitive.ObjectIDFromHex(chatroomIDStr)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chatroom ID"})
@@ -357,16 +357,16 @@ func (c *MessageReadStatusController) MarkAllMessagesInChatroomAsRead(ctx *gin.C
 // @Tags message-read-status
 // @Produce json
 // @Security ApiKeyAuth
-// @Param chatroom_id path string true "Chatroom ID"
+// @Param id path string true "Chatroom ID"
 // @Success 200 {object} models.MessageResponse "First unread message"
 // @Failure 400 {object} map[string]string "Invalid chatroom ID"
 // @Failure 401 {object} map[string]string "User not authenticated"
 // @Failure 404 {object} map[string]string "No unread messages found"
 // @Failure 500 {object} map[string]string "Internal server error"
-// @Router /chatrooms/{chatroom_id}/first-unread [get]
+// @Router /chatrooms/{id}/first-unread [get]
 func (c *MessageReadStatusController) GetFirstUnreadMessageInChatroom(ctx *gin.Context) {
 	// Get chatroom ID from URL parameter
-	chatroomIDStr := ctx.Param("chatroom_id")
+	chatroomIDStr := ctx.Param("id")
 	chatroomID, err := primitive.ObjectIDFromHex(chatroomIDStr)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chatroom ID"})
@@ -401,15 +401,15 @@ func (c *MessageReadStatusController) GetFirstUnreadMessageInChatroom(ctx *gin.C
 // @Tags message-read-status
 // @Produce json
 // @Security ApiKeyAuth
-// @Param chatroom_id path string true "Chatroom ID"
+// @Param id path string true "Chatroom ID"
 // @Success 200 {object} map[string]int64 "Unread message count"
 // @Failure 400 {object} map[string]string "Invalid chatroom ID"
 // @Failure 401 {object} map[string]string "User not authenticated"
 // @Failure 500 {object} map[string]string "Internal server error"
-// @Router /chatrooms/{chatroom_id}/unread-count [get]
+// @Router /chatrooms/{id}/unread-count [get]
 func (c *MessageReadStatusController) GetUnreadCountForChatroom(ctx *gin.Context) {
 	// Get chatroom ID from URL parameter
-	chatroomIDStr := ctx.Param("chatroom_id")
+	chatroomIDStr := ctx.Param("id")
 	chatroomID, err := primitive.ObjectIDFromHex(chatroomIDStr)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chatroom ID"})
