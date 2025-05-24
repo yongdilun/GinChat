@@ -4,6 +4,7 @@ import { User, Chatroom, Message } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { XIcon } from '@heroicons/react/outline';
 import MessageActions from './MessageActions';
+import { messageReadStatusAPI } from '@/services/api';
 
 // ArrowDownIcon as inline SVG
 const ArrowDownIcon = ({ className }: { className?: string }) => (
@@ -39,18 +40,79 @@ const MessageList: React.FC<MessageListProps> = ({
   onDeleteMessage
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [hasNavigatedToUnread, setHasNavigatedToUnread] = useState(false);
+  const [firstUnreadMessageId, setFirstUnreadMessageId] = useState<string | null>(null);
 
-  // Scroll to bottom when messages change
+  // Auto-navigate to first unread message when entering chatroom
   useEffect(() => {
-    // Use a small timeout to ensure the DOM has updated
+    if (!selectedChatroom || !user || hasNavigatedToUnread) return;
+
+    const navigateToFirstUnread = async () => {
+      try {
+        const response = await messageReadStatusAPI.getFirstUnreadMessage(selectedChatroom.id);
+        const firstUnreadMessage = response.data;
+
+        if (firstUnreadMessage) {
+          setFirstUnreadMessageId(firstUnreadMessage.id);
+
+          // Wait for DOM to update, then scroll to first unread message
+          setTimeout(() => {
+            const messageElement = document.getElementById(`message-${firstUnreadMessage.id}`);
+            if (messageElement) {
+              messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }, 300);
+        } else {
+          // No unread messages, scroll to bottom
+          setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+          }, 100);
+        }
+
+        setHasNavigatedToUnread(true);
+      } catch (error) {
+        console.error('Failed to get first unread message:', error);
+        // Fallback to scrolling to bottom
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+        setHasNavigatedToUnread(true);
+      }
+    };
+
+    if (messages.length > 0) {
+      navigateToFirstUnread();
+    }
+  }, [selectedChatroom, user, messages, hasNavigatedToUnread]);
+
+  // Auto-mark all messages as read when entering chatroom
+  useEffect(() => {
+    if (!selectedChatroom || !user) return;
+
+    const markAllAsRead = async () => {
+      try {
+        await messageReadStatusAPI.markAllMessagesAsRead(selectedChatroom.id);
+      } catch (error) {
+        console.error('Failed to mark messages as read:', error);
+      }
+    };
+
+    // Mark as read after a short delay to ensure user has seen the messages
     const timer = setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
+      markAllAsRead();
+    }, 2000);
 
     return () => clearTimeout(timer);
-  }, [messages]);
+  }, [selectedChatroom, user]);
+
+  // Reset navigation state when chatroom changes
+  useEffect(() => {
+    setHasNavigatedToUnread(false);
+    setFirstUnreadMessageId(null);
+  }, [selectedChatroom?.id]);
 
   // Extract filename from URL
   const getFilenameFromUrl = (url: string) => {
@@ -249,6 +311,7 @@ const MessageList: React.FC<MessageListProps> = ({
           {messages.map((message, index) => (
             <motion.div
               key={message.id}
+              id={`message-${message.id}`}
               variants={messageVariants}
               initial="hidden"
               animate="visible"
@@ -258,7 +321,7 @@ const MessageList: React.FC<MessageListProps> = ({
               }}
               className={`group relative ${
                 message.sender_id === user?.user_id ? 'text-right' : 'text-left'
-              }`}
+              } ${firstUnreadMessageId === message.id ? 'ring-2 ring-blue-400 ring-opacity-50 rounded-lg p-2' : ''}`}
             >
               <div
                 className={`inline-block px-4 py-2 rounded-lg max-w-[75%] shadow-sm hover:shadow-md transition-shadow duration-200 group ${

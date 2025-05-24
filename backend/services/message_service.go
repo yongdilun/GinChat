@@ -19,15 +19,17 @@ type MessageService struct {
 	MsgColl       *mongo.Collection
 	ChatSvc       *ChatroomService
 	CloudinarySvc *CloudinaryService
+	ReadStatusSvc *MessageReadStatusService
 }
 
 // NewMessageService creates a new MessageService
-func NewMessageService(mongodb *mongo.Database, chatroomService *ChatroomService, cloudinaryService *CloudinaryService) *MessageService {
+func NewMessageService(mongodb *mongo.Database, chatroomService *ChatroomService, cloudinaryService *CloudinaryService, readStatusService *MessageReadStatusService) *MessageService {
 	return &MessageService{
 		MongoDB:       mongodb,
 		MsgColl:       mongodb.Collection("messages"),
 		ChatSvc:       chatroomService,
 		CloudinarySvc: cloudinaryService,
+		ReadStatusSvc: readStatusService,
 	}
 }
 
@@ -85,6 +87,15 @@ func (s *MessageService) SendMessage(chatroomID primitive.ObjectID, userID uint,
 		return nil, errors.New("failed to send message")
 	}
 
+	// Create read status entries for all chatroom members (except sender)
+	if s.ReadStatusSvc != nil {
+		err = s.ReadStatusSvc.CreateReadStatusForMessage(message.ID, chatroomID, userID)
+		if err != nil {
+			// Log error but don't fail the message sending
+			// In production, you might want to queue this for retry
+		}
+	}
+
 	return &message, nil
 }
 
@@ -121,6 +132,33 @@ func (s *MessageService) GetMessages(chatroomID primitive.ObjectID, userID uint,
 	}
 
 	return messages, nil
+}
+
+// GetMessagesWithReadStatus retrieves messages from a chatroom with read status information
+func (s *MessageService) GetMessagesWithReadStatus(chatroomID primitive.ObjectID, userID uint, limit int) ([]models.MessageResponse, error) {
+	// Get messages first
+	messages, err := s.GetMessages(chatroomID, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to response format with read status
+	var messageResponses []models.MessageResponse
+	for _, message := range messages {
+		response := message.ToResponse()
+
+		// Get read status for this message if read status service is available
+		if s.ReadStatusSvc != nil {
+			readStatus, err := s.ReadStatusSvc.GetMessageReadStatus(message.ID)
+			if err == nil {
+				response.ReadStatus = readStatus
+			}
+		}
+
+		messageResponses = append(messageResponses, response)
+	}
+
+	return messageResponses, nil
 }
 
 // DeleteMessage deletes a message and its associated media

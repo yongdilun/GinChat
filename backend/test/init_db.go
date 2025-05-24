@@ -253,7 +253,8 @@ func initMongoDB() (*mongo.Database, error) {
 
 	// Drop existing collections
 	for _, collectionName := range collections {
-		if collectionName == "chatrooms" || collectionName == "messages" || collectionName == "chatroom_members" {
+		if collectionName == "chatrooms" || collectionName == "messages" || collectionName == "chatroom_members" ||
+			collectionName == "message_read_status" || collectionName == "user_last_read" {
 			log.Printf("Dropping existing collection: %s", collectionName)
 			err = db.Collection(collectionName).Drop(ctx)
 			if err != nil {
@@ -282,6 +283,18 @@ func initMongoDB() (*mongo.Database, error) {
 		return nil, fmt.Errorf("failed to create chatroom_members collection: %v", err)
 	}
 	log.Println("Created chatroom_members collection")
+
+	err = db.CreateCollection(ctx, "message_read_status")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create message_read_status collection: %v", err)
+	}
+	log.Println("Created message_read_status collection")
+
+	err = db.CreateCollection(ctx, "user_last_read")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create user_last_read collection: %v", err)
+	}
+	log.Println("Created user_last_read collection")
 
 	log.Println("MongoDB database initialization completed - ready for use")
 

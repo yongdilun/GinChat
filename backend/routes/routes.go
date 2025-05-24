@@ -73,6 +73,21 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, mongodb *mongo.Database, logger *lo
 			protected.PUT("/chatrooms/:id/messages/:messageId", messageController.UpdateMessage)
 			protected.DELETE("/chatrooms/:id/messages/:messageId", messageController.DeleteMessage)
 
+			// Message read status routes
+			messageReadStatusController := controllers.NewMessageReadStatusController(
+				services.NewMessageReadStatusService(mongodb, services.NewChatroomService(mongodb)),
+			)
+			protected.POST("/messages/read", messageReadStatusController.MarkMessageAsRead)
+			protected.POST("/messages/read-multiple", messageReadStatusController.MarkMultipleMessagesAsRead)
+			protected.GET("/messages/unread-counts", messageReadStatusController.GetUnreadCountForUser)
+			protected.GET("/messages/latest", messageReadStatusController.GetLatestMessagesForChatrooms)
+			protected.GET("/messages/:message_id/read-status", messageReadStatusController.GetMessageReadStatus)
+			protected.GET("/messages/:message_id/read-by-who", messageReadStatusController.GetMessageReadByWho)
+			protected.GET("/chatrooms/:chatroom_id/last-read", messageReadStatusController.GetUserLastReadForChatroom)
+			protected.POST("/chatrooms/:chatroom_id/mark-all-read", messageReadStatusController.MarkAllMessagesInChatroomAsRead)
+			protected.GET("/chatrooms/:chatroom_id/first-unread", messageReadStatusController.GetFirstUnreadMessageInChatroom)
+			protected.GET("/chatrooms/:chatroom_id/unread-count", messageReadStatusController.GetUnreadCountForChatroom)
+
 			// Media routes
 			protected.POST("/media/upload", mediaController.UploadMedia)
 		}

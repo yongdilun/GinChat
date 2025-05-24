@@ -32,6 +32,7 @@ type MessageResponse struct {
 	SentAt      time.Time  `json:"sent_at" example:"2023-01-01T12:00:00Z"`                                                                      // Timestamp when the message was sent
 	Edited      bool       `json:"edited" example:"false"`                                                                                      // Whether the message has been edited
 	EditedAt    *time.Time `json:"edited_at,omitempty" example:"2023-01-01T12:05:00Z"`                                                          // Timestamp when the message was last edited (null if never edited)
+	ReadStatus  []ReadInfo `json:"read_status,omitempty"`                                                                                       // Read status for each chatroom member
 }
 
 // ToResponse converts a Message to a MessageResponse

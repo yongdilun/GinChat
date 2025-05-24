@@ -127,6 +127,40 @@ export const chatroomAPI = {
   },
 };
 
+// Message Read Status API
+export const messageReadStatusAPI = {
+  markMessageAsRead: (messageId: string) => {
+    return api.post('/api/messages/read', { message_id: messageId });
+  },
+  markMultipleMessagesAsRead: (messageIds: string[]) => {
+    return api.post('/api/messages/read-multiple', messageIds);
+  },
+  getUnreadCounts: () => {
+    return api.get('/api/messages/unread-counts');
+  },
+  getLatestMessages: () => {
+    return api.get('/api/messages/latest');
+  },
+  getMessageReadStatus: (messageId: string) => {
+    return api.get(`/api/messages/${messageId}/read-status`);
+  },
+  getMessageReadByWho: (messageId: string) => {
+    return api.get(`/api/messages/${messageId}/read-by-who`);
+  },
+  getUserLastRead: (chatroomId: string) => {
+    return api.get(`/api/chatrooms/${chatroomId}/last-read`);
+  },
+  markAllMessagesAsRead: (chatroomId: string) => {
+    return api.post(`/api/chatrooms/${chatroomId}/mark-all-read`);
+  },
+  getFirstUnreadMessage: (chatroomId: string) => {
+    return api.get(`/api/chatrooms/${chatroomId}/first-unread`);
+  },
+  getUnreadCountForChatroom: (chatroomId: string) => {
+    return api.get(`/api/chatrooms/${chatroomId}/unread-count`);
+  },
+};
+
 // Message API
 export const messageAPI = {
   getMessages: (chatroomId: string) => {

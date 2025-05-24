@@ -52,6 +52,42 @@ export interface JoinChatroomByCodeRequest {
   password?: string;
 }
 
+export interface ReadInfo {
+  user_id: number;
+  username: string;
+  is_read: boolean;
+  read_at?: string;
+}
+
+export interface MessageReadStatus {
+  id: string;
+  message_id: string;
+  chatroom_id: string;
+  sender_id: number;
+  recipient_id: number;
+  is_read: boolean;
+  read_at?: string;
+  created_at: string;
+}
+
+export interface ChatroomUnreadCount {
+  chatroom_id: string;
+  chatroom_name: string;
+  unread_count: number;
+}
+
+export interface LatestChatMessage {
+  chatroom_id: string;
+  chatroom_name: string;
+  message_id: string;
+  sender_name: string;
+  message_type: string;
+  text_content?: string;
+  media_url?: string;
+  sent_at: string;
+  read_status: ReadInfo[];
+}
+
 export interface ChatroomResponse {
   chatroom: Chatroom;
 }
@@ -72,6 +108,7 @@ export interface Message {
   sent_at: string;
   edited?: boolean;
   edited_at?: string;
+  read_status?: ReadInfo[];
 }
 
 export interface SendMessageRequest {

@@ -1,8 +1,8 @@
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
-import { Message, User } from '@/types';
-import { messageAPI } from '@/services/api';
+import { Message, User, MessageReadStatus } from '@/types';
+import { messageAPI, messageReadStatusAPI } from '@/services/api';
 
 interface MessageActionsProps {
   message: Message;
@@ -51,6 +51,12 @@ const RemoveIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const InfoIcon = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
+
 const MessageActions: React.FC<MessageActionsProps> = ({
   message,
   user,
@@ -64,6 +70,9 @@ const MessageActions: React.FC<MessageActionsProps> = ({
   const [editMediaUrl, setEditMediaUrl] = useState(message.media_url || '');
   const [editMessageType, setEditMessageType] = useState(message.message_type || 'text');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showReadStatus, setShowReadStatus] = useState(false);
+  const [readStatusData, setReadStatusData] = useState<MessageReadStatus[]>([]);
+  const [isLoadingReadStatus, setIsLoadingReadStatus] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -150,6 +159,21 @@ const MessageActions: React.FC<MessageActionsProps> = ({
     setEditMediaUrl(message.media_url || '');
     setEditMessageType(message.message_type || 'text');
     onStartEdit();
+  };
+
+  const handleShowReadStatus = async () => {
+    setIsLoadingReadStatus(true);
+    setShowReadStatus(true);
+
+    try {
+      const response = await messageReadStatusAPI.getMessageReadByWho(message.id);
+      setReadStatusData(response.data);
+    } catch (error) {
+      console.error('Failed to fetch read status:', error);
+      setReadStatusData([]);
+    } finally {
+      setIsLoadingReadStatus(false);
+    }
   };
 
   if (isEditing) {
@@ -297,6 +321,17 @@ const MessageActions: React.FC<MessageActionsProps> = ({
           <EditIcon className="w-3.5 h-3.5" />
         </motion.button>
 
+        {/* Info Button - Read Status */}
+        <motion.button
+          onClick={handleShowReadStatus}
+          className="p-1.5 text-gray-400 hover:text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-full transition-colors duration-200"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          title="View read status"
+        >
+          <InfoIcon className="w-3.5 h-3.5" />
+        </motion.button>
+
         {/* Delete Button */}
         <motion.button
           onClick={() => setShowDeleteConfirm(true)}
@@ -359,6 +394,102 @@ const MessageActions: React.FC<MessageActionsProps> = ({
                   Cancel
                 </motion.button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Read Status Modal */}
+      <AnimatePresence>
+        {showReadStatus && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowReadStatus(false)}
+          >
+            <motion.div
+              className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md mx-4 shadow-xl max-h-[80vh] overflow-y-auto"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  Message Read Status
+                </h3>
+                <motion.button
+                  onClick={() => setShowReadStatus(false)}
+                  className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-full"
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                >
+                  <CancelIcon className="w-5 h-5" />
+                </motion.button>
+              </div>
+
+              {isLoadingReadStatus ? (
+                <div className="flex items-center justify-center py-8">
+                  <svg className="animate-spin h-6 w-6 text-primary-500" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span className="ml-2 text-gray-600 dark:text-gray-400">Loading...</span>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {readStatusData.length > 0 ? (
+                    readStatusData.map((status) => (
+                      <div
+                        key={status.recipient_id}
+                        className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                      >
+                        <div className="flex items-center">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-sm mr-3">
+                            {/* We'll need to get username from the status data */}
+                            U
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900 dark:text-gray-100">
+                              User {status.recipient_id}
+                            </p>
+                            {status.is_read && status.read_at && (
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                Read {new Date(status.read_at).toLocaleString()}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center">
+                          {status.is_read ? (
+                            <div className="flex items-center text-green-500">
+                              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                              <span className="text-sm font-medium">Read</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center text-gray-400">
+                              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                              </svg>
+                              <span className="text-sm">Unread</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-gray-500 dark:text-gray-400">
+                        No read status information available
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </motion.div>
           </motion.div>
         )}

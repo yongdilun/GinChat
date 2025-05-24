@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { User, Chatroom } from '@/types';
-import { chatroomAPI } from '@/services/api';
+import { User, Chatroom, LatestChatMessage, ChatroomUnreadCount } from '@/types';
+import { chatroomAPI, messageReadStatusAPI } from '@/services/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { XIcon } from '@heroicons/react/outline';
 import ChatroomActions from './ChatroomActions';
@@ -66,6 +66,8 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
   const [error, setError] = useState('');
   const [joinedChatrooms, setJoinedChatrooms] = useState<Chatroom[]>([]);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [latestMessages, setLatestMessages] = useState<LatestChatMessage[]>([]);
+  const [unreadCounts, setUnreadCounts] = useState<ChatroomUnreadCount[]>([]);
 
   // Filter chatrooms to show only joined ones
   useEffect(() => {
@@ -77,6 +79,59 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
 
     setJoinedChatrooms(joined);
   }, [chatrooms, user]);
+
+  // Fetch latest messages and unread counts
+  const fetchLatestMessagesAndCounts = async () => {
+    if (!user) return;
+
+    try {
+      const [latestResponse, unreadResponse] = await Promise.all([
+        messageReadStatusAPI.getLatestMessages(),
+        messageReadStatusAPI.getUnreadCounts(),
+      ]);
+
+      setLatestMessages(latestResponse.data);
+      setUnreadCounts(unreadResponse.data);
+    } catch (error) {
+      console.error('Failed to fetch latest messages and unread counts:', error);
+    }
+  };
+
+  // Fetch latest messages and unread counts when chatrooms change
+  useEffect(() => {
+    fetchLatestMessagesAndCounts();
+  }, [chatrooms, user]);
+
+  // Helper function to get latest message for a chatroom
+  const getLatestMessageForChatroom = (chatroomId: string) => {
+    return latestMessages.find(msg => msg.chatroom_id === chatroomId);
+  };
+
+  // Helper function to get unread count for a chatroom
+  const getUnreadCountForChatroom = (chatroomId: string) => {
+    const unreadData = unreadCounts.find(count => count.chatroom_id === chatroomId);
+    return unreadData?.unread_count || 0;
+  };
+
+  // Helper function to format latest message text
+  const formatLatestMessage = (message: LatestChatMessage) => {
+    if (!message.message_id) return 'No messages yet';
+
+    if (message.message_type === 'text') {
+      return message.text_content || '';
+    } else if (message.message_type === 'picture') {
+      return '📷 Photo';
+    } else if (message.message_type === 'audio') {
+      return '🎵 Audio';
+    } else if (message.message_type === 'video') {
+      return '🎥 Video';
+    } else if (message.message_type.includes('text_and_')) {
+      const mediaType = message.message_type.split('_and_')[1];
+      const mediaIcon = mediaType === 'picture' ? '📷' : mediaType === 'audio' ? '🎵' : '🎥';
+      return `${mediaIcon} ${message.text_content || 'Media with text'}`;
+    }
+    return 'Message';
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -608,25 +663,49 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                         whileHover={{ x: isSidebarCollapsed ? 0 : 4 }}
                         whileTap={{ scale: 0.98 }}
                       >
-                        <div className={`w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold ${
-                          isSidebarCollapsed ? 'mx-auto' : 'mr-3'
-                        }`}>
-                          {chatroom.name.charAt(0).toUpperCase()}
+                        <div className={`relative ${isSidebarCollapsed ? 'mx-auto' : 'mr-3'}`}>
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold">
+                            {chatroom.name.charAt(0).toUpperCase()}
+                          </div>
+                          {isSidebarCollapsed && getUnreadCountForChatroom(chatroom.id) > 0 && (
+                            <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                              {getUnreadCountForChatroom(chatroom.id) > 9 ? '9+' : getUnreadCountForChatroom(chatroom.id)}
+                            </div>
+                          )}
                         </div>
                         {!isSidebarCollapsed && (
                           <div className="overflow-hidden flex-1">
-                            <div className="flex items-center gap-2">
-                              <p className={`font-medium truncate ${
-                                selectedChatroom?.id === chatroom.id ? 'text-primary-600 dark:text-primary-400' : ''
-                              }`}>{chatroom.name}</p>
-                              {chatroom.has_password && (
-                                <svg className="w-3 h-3 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                                </svg>
+                            <div className="flex items-center gap-2 justify-between">
+                              <div className="flex items-center gap-2 flex-1 min-w-0">
+                                <p className={`font-medium truncate ${
+                                  selectedChatroom?.id === chatroom.id ? 'text-primary-600 dark:text-primary-400' : ''
+                                }`}>{chatroom.name}</p>
+                                {chatroom.has_password && (
+                                  <svg className="w-3 h-3 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                                  </svg>
+                                )}
+                              </div>
+                              {getUnreadCountForChatroom(chatroom.id) > 0 && (
+                                <div className="bg-red-500 text-white text-xs rounded-full px-2 py-0.5 min-w-[20px] text-center flex-shrink-0">
+                                  {getUnreadCountForChatroom(chatroom.id)}
+                                </div>
                               )}
                             </div>
-                            <div className="flex items-center justify-between">
+                            <div className="mt-1">
                               <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                {(() => {
+                                  const latestMessage = getLatestMessageForChatroom(chatroom.id);
+                                  if (latestMessage) {
+                                    const formattedMessage = formatLatestMessage(latestMessage);
+                                    return formattedMessage.length > 30 ? `${formattedMessage.substring(0, 30)}...` : formattedMessage;
+                                  }
+                                  return 'No messages yet';
+                                })()}
+                              </p>
+                            </div>
+                            <div className="flex items-center justify-between mt-1">
+                              <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
                                 {chatroom.members.length} member{chatroom.members.length !== 1 ? 's' : ''}
                               </p>
                               <p className="text-xs text-gray-400 dark:text-gray-500 font-mono">

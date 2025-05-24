@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ginchat/models"
 	"github.com/ginchat/services"
 	"github.com/ginchat/utils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -23,7 +22,8 @@ type MessageController struct {
 func NewMessageController(db *gorm.DB, mongodb *mongo.Database) *MessageController {
 	chatroomService := services.NewChatroomService(mongodb)
 	cloudinaryService, _ := services.NewCloudinaryService() // Ignore error for now, will be nil if not configured
-	messageService := services.NewMessageService(mongodb, chatroomService, cloudinaryService)
+	readStatusService := services.NewMessageReadStatusService(mongodb, chatroomService)
+	messageService := services.NewMessageService(mongodb, chatroomService, cloudinaryService, readStatusService)
 	return &MessageController{
 		MessageService: messageService,
 	}
@@ -159,8 +159,8 @@ func (mc *MessageController) GetMessages(c *gin.Context) {
 		}
 	}
 
-	// Get messages using the service
-	messages, err := mc.MessageService.GetMessages(chatroomID, userID.(uint), limit)
+	// Get messages with read status using the service
+	messages, err := mc.MessageService.GetMessagesWithReadStatus(chatroomID, userID.(uint), limit)
 	if err != nil {
 		if err.Error() == "chatroom not found" {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
@@ -172,14 +172,8 @@ func (mc *MessageController) GetMessages(c *gin.Context) {
 		return
 	}
 
-	// Convert to response format
-	var response []models.MessageResponse
-	for _, message := range messages {
-		response = append(response, message.ToResponse())
-	}
-
 	c.JSON(http.StatusOK, gin.H{
-		"messages": response,
+		"messages": messages,
 	})
 }
 
