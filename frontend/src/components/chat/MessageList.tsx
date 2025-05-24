@@ -75,14 +75,23 @@ const MessageList: React.FC<MessageListProps> = ({
         break;
 
       case 'message_read':
-        // Handle real-time read status updates (simplified)
+        // Handle real-time read status updates with API verification
         if (lastMessage.chatroom_id === selectedChatroom.id) {
           if (lastMessage.data) {
             const data = lastMessage.data as { message_id?: string; read_status?: ReadInfo[] };
-            if (data.message_id && data.read_status && onMessageReadStatusUpdate) {
-              // Update the specific message's read status in real-time
-              onMessageReadStatusUpdate(data.message_id, data.read_status);
-              console.log(`✅ Updated read status for message ${data.message_id}`);
+            if (data.message_id) {
+              console.log(`📡 WebSocket read status update for message ${data.message_id}`);
+
+              // Use WebSocket data if available
+              if (data.read_status && onMessageReadStatusUpdate) {
+                onMessageReadStatusUpdate(data.message_id, data.read_status);
+                console.log(`✅ Updated from WebSocket:`, data.read_status);
+              }
+
+              // Also refresh from API to ensure accuracy (like working read status modal)
+              setTimeout(() => {
+                refreshMessageReadStatus(data.message_id!);
+              }, 100); // Small delay to avoid race conditions
             }
           }
         }
@@ -143,8 +152,28 @@ const MessageList: React.FC<MessageListProps> = ({
     try {
       await messageReadStatusAPI.markMessageAsRead(messageId);
       console.log('Manually marked message as read:', messageId);
+
+      // Immediately refresh the read status for this message (like working read status modal)
+      await refreshMessageReadStatus(messageId);
     } catch (error) {
       console.error('Failed to mark message as read:', error);
+    }
+  };
+
+  // Refresh read status for a specific message (using same approach as working read status modal)
+  const refreshMessageReadStatus = async (messageId: string) => {
+    try {
+      console.log('🔄 Refreshing read status for message:', messageId);
+      const response = await messageReadStatusAPI.getMessageReadStatus(messageId);
+      const freshReadStatus = response.data;
+
+      // Update the message with fresh read status data
+      if (onMessageReadStatusUpdate) {
+        onMessageReadStatusUpdate(messageId, freshReadStatus);
+        console.log('✅ Refreshed read status from API:', freshReadStatus);
+      }
+    } catch (error) {
+      console.error('Failed to refresh read status:', error);
     }
   };
 
@@ -191,6 +220,37 @@ const MessageList: React.FC<MessageListProps> = ({
       }
     });
   }, [messages, user?.user_id]);
+
+  // Periodic refresh of read status for sender's messages (like working read status modal approach)
+  useEffect(() => {
+    if (!user || !selectedChatroom || messages.length === 0) return;
+
+    const refreshSenderMessages = async () => {
+      const senderMessages = messages.filter(msg =>
+        msg.sender_id === user.user_id &&
+        msg.read_status &&
+        !msg.read_status.every(status => status.is_read) // Only refresh unread messages
+      );
+
+      if (senderMessages.length > 0) {
+        console.log(`🔄 Refreshing read status for ${senderMessages.length} sender messages`);
+
+        // Refresh read status for each sender message
+        for (const msg of senderMessages) {
+          try {
+            await refreshMessageReadStatus(msg.id);
+          } catch (error) {
+            console.error(`Failed to refresh read status for message ${msg.id}:`, error);
+          }
+        }
+      }
+    };
+
+    // Refresh every 5 seconds for testing (can be increased for production)
+    const interval = setInterval(refreshSenderMessages, 5000);
+
+    return () => clearInterval(interval);
+  }, [messages, user, selectedChatroom]);
 
   // Extract filename from URL
   const getFilenameFromUrl = (url: string) => {
@@ -542,20 +602,29 @@ const MessageList: React.FC<MessageListProps> = ({
                           // Debug logging for tick rendering
                           const readStatus = message.read_status || [];
                           const allRead = readStatus.length > 0 && readStatus.every(status => status.is_read);
+                          const readCount = readStatus.filter(status => status.is_read).length;
+                          const totalCount = readStatus.length;
+
                           console.log(`🎨 Rendering ticks for message ${message.id}:`, {
                             readStatus,
                             allRead,
+                            readCount,
+                            totalCount,
                             tickColor: allRead ? 'BLUE' : 'GREY'
                           });
 
                           if (allRead) {
-                            // All read - blue double tick
+                            // All read - blue double tick with animation
                             return (
-                              <div className="flex items-center text-blue-500" title="Read">
-                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <div
+                                className="flex items-center text-blue-500 transition-all duration-300"
+                                title={`Read by all (${readCount}/${totalCount})`}
+                                key={`blue-${message.id}-${readCount}`} // Force re-render on status change
+                              >
+                                <svg className="w-4 h-4 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
                                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                 </svg>
-                                <svg className="w-4 h-4 -ml-1" fill="currentColor" viewBox="0 0 20 20">
+                                <svg className="w-4 h-4 -ml-1 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
                                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                 </svg>
                               </div>
@@ -563,7 +632,11 @@ const MessageList: React.FC<MessageListProps> = ({
                           } else {
                             // Not read - gray double tick
                             return (
-                              <div className="flex items-center text-gray-400" title="Delivered">
+                              <div
+                                className="flex items-center text-gray-400 transition-all duration-300"
+                                title={totalCount > 0 ? `Read by ${readCount} of ${totalCount}` : "Delivered"}
+                                key={`grey-${message.id}-${readCount}`} // Force re-render on status change
+                              >
                                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                 </svg>
