@@ -374,20 +374,35 @@ const MessageList: React.FC<MessageListProps> = ({
                     {new Date(message.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 </div>
+              </div>
 
-                {/* Message Actions */}
-                {onEditMessage && onDeleteMessage && (
+              {/* Message Actions - Outside the message bubble to prevent height issues */}
+              {onEditMessage && onDeleteMessage && editingMessageId !== message.id && (
+                <MessageActions
+                  message={message}
+                  user={user}
+                  onEdit={onEditMessage}
+                  onDelete={onDeleteMessage}
+                  isEditing={false}
+                  onStartEdit={() => setEditingMessageId(message.id)}
+                  onCancelEdit={() => setEditingMessageId(null)}
+                />
+              )}
+
+              {/* Editing Interface - Separate from message bubble */}
+              {onEditMessage && onDeleteMessage && editingMessageId === message.id && (
+                <div className="mt-2">
                   <MessageActions
                     message={message}
                     user={user}
                     onEdit={onEditMessage}
                     onDelete={onDeleteMessage}
-                    isEditing={editingMessageId === message.id}
+                    isEditing={true}
                     onStartEdit={() => setEditingMessageId(message.id)}
                     onCancelEdit={() => setEditingMessageId(null)}
                   />
-                )}
-              </div>
+                </div>
+              )}
             </motion.div>
           ))}
         </motion.div>

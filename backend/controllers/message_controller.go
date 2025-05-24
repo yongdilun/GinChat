@@ -40,6 +40,7 @@ type SendMessageRequest struct {
 type UpdateMessageRequest struct {
 	TextContent string `json:"text_content" example:"Updated message content"`                                                  // New text content of the message
 	MediaURL    string `json:"media_url" example:"https://res.cloudinary.com/your-cloud/image/upload/v123456789/new_image.jpg"` // New media URL (optional)
+	MessageType string `json:"message_type" example:"text_and_picture"`                                                         // New message type (optional, will be auto-determined if not provided)
 }
 
 // SendMessage handles sending a message to a chatroom
@@ -221,7 +222,7 @@ func (mc *MessageController) UpdateMessage(c *gin.Context) {
 	}
 
 	// Update message using the service
-	message, err := mc.MessageService.UpdateMessage(messageID, userID.(uint), req.TextContent, req.MediaURL)
+	message, err := mc.MessageService.UpdateMessage(messageID, userID.(uint), req.TextContent, req.MediaURL, req.MessageType)
 	if err != nil {
 		switch err.Error() {
 		case "message not found":

@@ -351,11 +351,11 @@ export default function ChatPage() {
   }, []);
 
   // Handle message update
-  const handleEditMessage = useCallback(async (messageId: string, newContent: string, newMediaUrl?: string) => {
+  const handleEditMessage = useCallback(async (messageId: string, newContent: string, newMediaUrl?: string, newMessageType?: string) => {
     if (!selectedChatroom) return;
 
     try {
-      const response = await messageAPI.updateMessage(selectedChatroom.id, messageId, newContent, newMediaUrl);
+      const response = await messageAPI.updateMessage(selectedChatroom.id, messageId, newContent, newMediaUrl, newMessageType);
       const updatedMessage = response.data.message;
 
       // Update the message in the local state

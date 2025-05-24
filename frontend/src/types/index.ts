@@ -75,6 +75,7 @@ export interface SendMessageRequest {
 export interface UpdateMessageRequest {
   text_content?: string;
   media_url?: string;
+  message_type?: string;
 }
 
 export interface MessageResponse {

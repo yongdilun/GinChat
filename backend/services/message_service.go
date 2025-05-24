@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/ginchat/models"
@@ -156,7 +157,7 @@ func (s *MessageService) DeleteMessage(messageID primitive.ObjectID, userID uint
 }
 
 // UpdateMessage updates a message with new content and/or media
-func (s *MessageService) UpdateMessage(messageID primitive.ObjectID, userID uint, textContent, newMediaURL string) (*models.Message, error) {
+func (s *MessageService) UpdateMessage(messageID primitive.ObjectID, userID uint, textContent, newMediaURL, newMessageType string) (*models.Message, error) {
 	// Find the message
 	var message models.Message
 	err := s.MsgColl.FindOne(context.Background(), bson.M{"_id": messageID}).Decode(&message)
@@ -178,17 +179,52 @@ func (s *MessageService) UpdateMessage(messageID primitive.ObjectID, userID uint
 		}
 	}
 
+	// Determine the new message type based on content
+	finalMessageType := newMessageType
+	if finalMessageType == "" {
+		// Auto-determine message type based on content
+		if textContent != "" && newMediaURL != "" {
+			// Determine combined type based on media URL or existing type
+			if strings.Contains(message.MessageType, "picture") || strings.Contains(newMessageType, "picture") {
+				finalMessageType = "text_and_picture"
+			} else if strings.Contains(message.MessageType, "audio") || strings.Contains(newMessageType, "audio") {
+				finalMessageType = "text_and_audio"
+			} else if strings.Contains(message.MessageType, "video") || strings.Contains(newMessageType, "video") {
+				finalMessageType = "text_and_video"
+			} else {
+				finalMessageType = "text_and_picture" // Default for combined
+			}
+		} else if textContent != "" && newMediaURL == "" {
+			finalMessageType = "text"
+		} else if textContent == "" && newMediaURL != "" {
+			// Determine media type based on URL or existing type
+			if strings.Contains(message.MessageType, "picture") || strings.Contains(newMessageType, "picture") {
+				finalMessageType = "picture"
+			} else if strings.Contains(message.MessageType, "audio") || strings.Contains(newMessageType, "audio") {
+				finalMessageType = "audio"
+			} else if strings.Contains(message.MessageType, "video") || strings.Contains(newMessageType, "video") {
+				finalMessageType = "video"
+			} else {
+				finalMessageType = "picture" // Default for media only
+			}
+		} else {
+			// Keep original type if no content changes
+			finalMessageType = message.MessageType
+		}
+	}
+
 	// Prepare update fields
 	updateFields := bson.M{
 		"text_content": textContent,
+		"message_type": finalMessageType,
 		"edited":       true,
 		"edited_at":    time.Now(),
 	}
 
-	// Update media URL if provided
+	// Update media URL
 	if newMediaURL != "" {
 		updateFields["media_url"] = newMediaURL
-	} else if message.MediaURL != "" && newMediaURL == "" {
+	} else {
 		// If removing media, set to empty string
 		updateFields["media_url"] = ""
 	}
@@ -214,7 +250,7 @@ func (s *MessageService) UpdateMessage(messageID primitive.ObjectID, userID uint
 
 // EditMessage edits only the text content of a message (legacy function for backward compatibility)
 func (s *MessageService) EditMessage(messageID primitive.ObjectID, userID uint, textContent string) (*models.Message, error) {
-	return s.UpdateMessage(messageID, userID, textContent, "")
+	return s.UpdateMessage(messageID, userID, textContent, "", "")
 }
 
 // DeleteAllMessagesInChatroom deletes all messages in a chatroom and their associated media

@@ -136,10 +136,11 @@ export const messageAPI = {
       media_url: mediaURL,
     });
   },
-  updateMessage: (chatroomId: string, messageId: string, textContent?: string, mediaURL?: string) => {
+  updateMessage: (chatroomId: string, messageId: string, textContent?: string, mediaURL?: string, messageType?: string) => {
     return api.put(`/api/chatrooms/${chatroomId}/messages/${messageId}`, {
       text_content: textContent,
       media_url: mediaURL,
+      message_type: messageType,
     });
   },
   deleteMessage: (chatroomId: string, messageId: string) => {
