@@ -13,7 +13,7 @@ const api = axios.create({
     'Accept': 'application/json',
   },
   // Set a timeout to avoid hanging requests
-  timeout: 10000, // 10 seconds
+  timeout: 15000, // 15 seconds (increased for better stability)
 });
 
 // Add a request interceptor to add the auth token to every request
@@ -60,9 +60,19 @@ api.interceptors.response.use(
     } else if (error.request) {
       // The request was made but no response was received
       console.error('Network error:', error.request);
-      // Show a user-friendly error message
-      if (window.location.pathname !== '/auth/login') {
-        alert('Unable to connect to the server. Please check your internet connection and try again.');
+      // Only show error message for critical requests, not for auto-mark or frequent polling
+      const isAutoMarkRequest = error.config?.url?.includes('/messages/read');
+      const isPollingRequest = error.config?.url?.includes('/messages/unread-counts') ||
+                              error.config?.url?.includes('/messages/latest');
+
+      if (window.location.pathname !== '/auth/login' && !isAutoMarkRequest && !isPollingRequest) {
+        // Rate limit error messages to prevent spam
+        const lastErrorTime = localStorage.getItem('lastNetworkErrorTime');
+        const now = Date.now();
+        if (!lastErrorTime || now - parseInt(lastErrorTime) > 30000) { // 30 seconds
+          localStorage.setItem('lastNetworkErrorTime', now.toString());
+          alert('Unable to connect to the server. Please check your internet connection and try again.');
+        }
       }
     } else {
       // Something happened in setting up the request that triggered an Error
@@ -71,6 +81,13 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// Health check API
+export const healthAPI = {
+  check: () => {
+    return api.get('/health', { timeout: 5000 });
+  },
+};
 
 // Auth API
 export const authAPI = {
