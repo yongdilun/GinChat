@@ -564,19 +564,17 @@ func (wsc *WebSocketController) BroadcastMessageRead(chatroomID string, readData
 	// Send to broadcast channel for room-specific broadcasting
 	wsc.broadcast <- jsonMessage
 
-	// Also send to all connected users for real-time read status updates
+	// Send read status updates only to chatroom members (more efficient)
 	wsc.clientsMux.RLock()
-	for userID, connections := range wsc.clients {
-		for conn := range connections {
+	if clients, ok := wsc.rooms[chatroomID]; ok {
+		for conn := range clients {
 			err := conn.WriteMessage(websocket.TextMessage, jsonMessage)
 			if err != nil {
-				wsc.logger.Errorf("Failed to send read status update to user %d: %v", userID, err)
+				wsc.logger.Errorf("Failed to send read status update to chatroom %s: %v", chatroomID, err)
 			}
 		}
 	}
 	wsc.clientsMux.RUnlock()
-
-	wsc.logger.Infof("Broadcasted message read status to chatroom %s", chatroomID)
 }
 
 // BroadcastMessageReadGlobal is a helper function to broadcast message read status using the global controller
