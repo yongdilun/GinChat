@@ -79,8 +79,10 @@ const MessageList: React.FC<MessageListProps> = ({
         if (lastMessage.chatroom_id === selectedChatroom.id) {
           console.log('Message read status update via WebSocket:', lastMessage.data);
           if (onMessageReadStatusUpdate && lastMessage.data) {
-            const data = lastMessage.data as any;
-            onMessageReadStatusUpdate(data.message_id, data.read_status);
+            const data = lastMessage.data as { message_id?: string; read_status?: ReadInfo[] };
+            if (data.message_id && data.read_status) {
+              onMessageReadStatusUpdate(data.message_id, data.read_status);
+            }
           }
           // Refresh messages to get updated read status
           if (onRefreshMessages) {
@@ -159,7 +161,7 @@ const MessageList: React.FC<MessageListProps> = ({
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [selectedChatroom, user]);
+  }, [selectedChatroom, user, onRefreshMessages]);
 
   // Reset first unread message when chatroom changes
   useEffect(() => {
