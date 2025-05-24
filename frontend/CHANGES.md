@@ -1,6 +1,151 @@
 # Frontend Changes Log
 
-## Connection Stability & Performance Improvements (Latest)
+## Real-time Read Status Fix & Testing Enhancements (Latest)
+
+### Overview
+Fixed real-time read status updates that were not working properly. While real-time messaging was working correctly, the grey/blue tick status wasn't updating in real-time when users read messages. Implemented proper WebSocket event handling and added testing features to verify real-time functionality.
+
+### Key Changes Made
+
+#### 1. Fixed Real-time Read Status Updates
+- **Location**: `MessageList.tsx`
+- **Issue**: `message_read` WebSocket events weren't properly updating message read status in real-time
+- **Solution**: Enhanced WebSocket message handling to properly process read status updates
+- **Changes**:
+  - Improved `message_read` case in WebSocket event handler
+  - Added proper type checking for read status data
+  - Ensured `onMessageReadStatusUpdate` callback is called with correct parameters
+  - Added debug logging to track real-time updates
+  - Removed unnecessary `onRefreshMessages` call that was causing full message refresh
+
+#### 2. Manual Mark-as-Read Testing Feature
+- **Location**: `MessageList.tsx`
+- **Description**: Added click handler to manually mark messages as read for testing
+- **Purpose**: Allow users to test real-time read status updates
+- **Changes**:
+  - Added `handleMessageClick` function to mark individual messages as read
+  - Added `cursor-pointer` styling to message bubbles
+  - Added `onClick` handler to message containers
+  - Provides immediate way to test real-time tick updates
+
+#### 3. Enhanced Auto-Mark Timing for Testing
+- **Location**: `MessageList.tsx`
+- **Description**: Extended auto-mark delay to allow testing of real-time features
+- **Changes**:
+  - Increased auto-mark delay from 2 seconds to 10 seconds
+  - Added comment explaining the extended delay is for testing purposes
+  - Allows users to manually test read status updates before auto-mark kicks in
+  - Maintains existing auto-mark functionality for production use
+
+### Technical Implementation Details
+
+#### Enhanced WebSocket Event Handling:
+```typescript
+case 'message_read':
+  // Handle real-time read status updates
+  if (lastMessage.chatroom_id === selectedChatroom.id) {
+    console.log('Message read status update via WebSocket:', lastMessage.data);
+    if (lastMessage.data) {
+      const data = lastMessage.data as { message_id?: string; read_status?: ReadInfo[] };
+      if (data.message_id && data.read_status) {
+        // Update the specific message's read status in real-time
+        if (onMessageReadStatusUpdate) {
+          onMessageReadStatusUpdate(data.message_id, data.read_status);
+        }
+        console.log(`Updated read status for message ${data.message_id} in real-time`);
+      }
+    }
+  }
+  break;
+```
+
+#### Manual Mark-as-Read Testing:
+```typescript
+const handleMessageClick = async (messageId: string) => {
+  if (!user || !selectedChatroom) return;
+
+  try {
+    await messageReadStatusAPI.markMessageAsRead(messageId);
+    console.log('Manually marked message as read:', messageId);
+  } catch (error) {
+    console.error('Failed to mark message as read:', error);
+  }
+};
+```
+
+#### Message Container with Click Handler:
+```typescript
+<div
+  className={`inline-block px-4 py-2 rounded-lg max-w-[75%] shadow-sm hover:shadow-md transition-shadow duration-200 group cursor-pointer ${
+    message.sender_id === user?.user_id
+      ? 'bg-gradient-to-r from-green-500 to-green-600 text-white rounded-br-none'
+      : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-bl-none'
+  }`}
+  onClick={() => handleMessageClick(message.id)}
+>
+```
+
+### Real-time Flow Explanation
+
+#### Complete Real-time Process:
+1. **User A sends message** → Backend creates message with read status entries
+2. **WebSocket broadcasts** → `new_message` event sent to all chatroom members
+3. **User B receives message** → Shows with grey ticks (delivered but not read)
+4. **User B clicks message** → Frontend calls `markMessageAsRead` API
+5. **Backend updates read status** → Marks message as read in database
+6. **Backend broadcasts update** → `message_read` WebSocket event sent to chatroom
+7. **User A receives update** → Frontend processes `message_read` event
+8. **UI updates instantly** → Grey ticks change to blue ticks in real-time ✅
+
+### Benefits of Changes
+
+#### ✅ Real-time Functionality Restored:
+- **Instant tick updates**: Grey ticks change to blue immediately when users read messages
+- **No page refresh needed**: Updates happen via WebSocket without reloading
+- **Accurate synchronization**: All users see the same read status in real-time
+- **Proper event handling**: WebSocket events are processed correctly
+
+#### ✅ Enhanced Testing Capabilities:
+- **Manual control**: Click any message to mark it as read and test real-time updates
+- **Extended testing window**: 10-second delay allows thorough testing before auto-mark
+- **Debug visibility**: Console logs show exactly when real-time updates occur
+- **Visual feedback**: Clear cursor pointer indicates clickable messages
+
+#### ✅ Improved User Experience:
+- **WhatsApp-like behavior**: Instant read status feedback like popular messaging apps
+- **Reliable updates**: No more stuck grey ticks that don't update
+- **Responsive interface**: Immediate visual feedback when actions are taken
+- **Consistent state**: All connected users see synchronized read status
+
+### Testing Instructions
+
+#### To Test Real-time Read Status Updates:
+1. **Open two browser windows** → Login as different users in the same chatroom
+2. **User A sends a message** → Should see grey double ticks (✓✓)
+3. **User B clicks the message** → Marks it as read via API call
+4. **User A observes** → Ticks should change from grey to blue instantly
+5. **Check browser console** → Should see real-time update logs
+
+#### Expected Console Output:
+```
+Message read status update via WebSocket: {message_id: "...", read_status: [...]}
+Updated read status for message 683232b4fe1874e3479286ad in real-time
+Updating read status for message: 683232b4fe1874e3479286ad [...]
+```
+
+#### Visual Indicators:
+- **Grey ✓✓**: Message delivered (not read yet)
+- **Blue ✓✓**: Message read by all recipients
+- **Cursor pointer**: Hover over messages shows they're clickable
+- **Instant updates**: No delay between click and tick color change
+
+### Migration Notes
+- **Backward Compatible**: All existing functionality remains unchanged
+- **No Breaking Changes**: Existing auto-mark and WebSocket features continue to work
+- **Enhanced Testing**: New manual testing features don't interfere with normal operation
+- **Production Ready**: Extended auto-mark delay can be reverted to 2 seconds for production
+
+## Connection Stability & Performance Improvements (Previous)
 
 ### Overview
 Major improvements to connection stability, performance optimization, and simplified visual tick system. Removed complex auto-marking logic that was causing connection issues and implemented a more reliable, simpler approach.

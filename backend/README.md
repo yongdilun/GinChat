@@ -1423,7 +1423,15 @@ go build -o ginchat-server
 
 ## Recent Updates & Improvements
 
-### WebSocket Enhancements (Latest)
+### Real-time Read Status Broadcasting (Latest)
+- **Enhanced WebSocket Broadcasting**: Improved `message_read` event broadcasting for real-time tick updates
+- **Automatic Read Status Updates**: Backend automatically broadcasts read status changes via WebSocket
+- **Multi-Event Broadcasting**: Supports both single message and bulk message read status updates
+- **Chatroom-Specific Broadcasting**: Read status updates sent only to relevant chatroom members
+- **Comprehensive Event Coverage**: Broadcasts on `MarkMessageAsRead`, `MarkAllMessagesInChatroomAsRead`
+- **Real-time Synchronization**: All connected users receive instant read status updates
+
+### WebSocket Enhancements (Previous)
 - **Thread-Safe WebSocket Connections**: Implemented `SafeWebSocketConn` wrapper to prevent concurrent write crashes
 - **Simplified Auto-Mark Logic**: Removed complex auto-marking during WebSocket broadcasts for better performance
 - **Enhanced Connection Management**: Added panic recovery and better error handling for WebSocket operations

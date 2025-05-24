@@ -2,7 +2,9 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ginchat/models"
@@ -75,18 +77,36 @@ func (c *MessageReadStatusController) MarkMessageAsRead(ctx *gin.Context) {
 		return
 	}
 
-	// Send WebSocket notification about message read status update
+	// Send WebSocket notification about message read status update with enhanced data
 	readStatus, err := c.ReadStatusService.GetMessageReadStatus(messageObjectID)
 	if err == nil {
 		// Get the message to find the chatroom
 		var message models.Message
 		err := c.ReadStatusService.MessageColl.FindOne(context.Background(), bson.M{"_id": messageObjectID}).Decode(&message)
 		if err == nil {
-			// Broadcast read status update to the chatroom
+			// Calculate read status statistics for real-time tick updates
+			totalRecipients := len(readStatus)
+			readCount := 0
+			for _, status := range readStatus {
+				if status.IsRead {
+					readCount++
+				}
+			}
+			allRead := totalRecipients > 0 && readCount == totalRecipients
+
+			// Broadcast enhanced read status update to the chatroom
 			BroadcastMessageReadGlobal(message.ChatroomID.Hex(), map[string]any{
-				"message_id":  messageObjectID.Hex(),
-				"read_status": readStatus,
+				"message_id":       messageObjectID.Hex(),
+				"read_status":      readStatus,
+				"user_id":          userID.(uint),
+				"read_count":       readCount,
+				"total_recipients": totalRecipients,
+				"all_read":         allRead,
+				"timestamp":        time.Now().Format(time.RFC3339),
 			})
+
+			fmt.Printf("📡 Broadcasting read status update: Message %s - %d/%d read (all_read: %v)\n",
+				messageObjectID.Hex(), readCount, totalRecipients, allRead)
 
 			// Get updated unread counts for all users in the chatroom
 			chatroom, err := c.ReadStatusService.ChatroomService.GetChatroomByID(message.ChatroomID)
@@ -384,16 +404,34 @@ func (c *MessageReadStatusController) MarkAllMessagesInChatroomAsRead(ctx *gin.C
 		return
 	}
 
-	// Send WebSocket notifications for each message that was marked as read
+	// Send WebSocket notifications for each message that was marked as read with enhanced data
 	for _, message := range unreadMessages {
 		readStatus, err := c.ReadStatusService.GetMessageReadStatus(message.ID)
 		if err == nil {
-			// Broadcast read status update for this specific message
+			// Calculate read status statistics for real-time tick updates
+			totalRecipients := len(readStatus)
+			readCount := 0
+			for _, status := range readStatus {
+				if status.IsRead {
+					readCount++
+				}
+			}
+			allRead := totalRecipients > 0 && readCount == totalRecipients
+
+			// Broadcast enhanced read status update for this specific message
 			BroadcastMessageReadGlobal(chatroomID.Hex(), map[string]any{
-				"message_id":  message.ID.Hex(),
-				"read_status": readStatus,
-				"user_id":     userID.(uint),
+				"message_id":       message.ID.Hex(),
+				"read_status":      readStatus,
+				"user_id":          userID.(uint),
+				"read_count":       readCount,
+				"total_recipients": totalRecipients,
+				"all_read":         allRead,
+				"timestamp":        time.Now().Format(time.RFC3339),
+				"bulk_update":      true,
 			})
+
+			fmt.Printf("📡 Broadcasting bulk read status update: Message %s - %d/%d read (all_read: %v)\n",
+				message.ID.Hex(), readCount, totalRecipients, allRead)
 		}
 	}
 

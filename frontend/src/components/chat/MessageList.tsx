@@ -75,17 +75,45 @@ const MessageList: React.FC<MessageListProps> = ({
         break;
 
       case 'message_read':
-        // Handle real-time read status updates
+        // Handle real-time read status updates for immediate tick changes
         if (lastMessage.chatroom_id === selectedChatroom.id) {
-          console.log('Message read status update via WebSocket:', lastMessage.data);
+          console.log('🔄 Real-time read status update via WebSocket:', lastMessage.data);
           if (lastMessage.data) {
-            const data = lastMessage.data as { message_id?: string; read_status?: ReadInfo[] };
+            const data = lastMessage.data as {
+              message_id?: string;
+              read_status?: ReadInfo[];
+              user_id?: number;
+              read_count?: number;
+              total_recipients?: number;
+              all_read?: boolean;
+              timestamp?: string;
+              bulk_update?: boolean;
+            };
+
             if (data.message_id && data.read_status) {
               // Update the specific message's read status in real-time
               if (onMessageReadStatusUpdate) {
                 onMessageReadStatusUpdate(data.message_id, data.read_status);
               }
-              console.log(`Updated read status for message ${data.message_id} in real-time`);
+
+              // Enhanced logging with backend-provided statistics
+              const readCount = data.read_count || data.read_status.filter(status => status.is_read).length;
+              const totalCount = data.total_recipients || data.read_status.length;
+              const allRead = data.all_read !== undefined ? data.all_read : data.read_status.every(status => status.is_read);
+
+              console.log(`✅ Real-time tick update for message ${data.message_id}:`);
+              console.log(`   📊 Read Status: ${readCount}/${totalCount} users have read`);
+              console.log(`   🎨 Tick Color: ${allRead ? '🔵 BLUE (all read)' : '⚪ GREY (partial/none read)'}`);
+              console.log(`   👤 Updated by User ID: ${data.user_id || 'unknown'}`);
+              console.log(`   ⏰ Timestamp: ${data.timestamp || 'unknown'}`);
+              console.log(`   📦 Bulk Update: ${data.bulk_update ? 'Yes' : 'No'}`);
+
+              // Visual feedback for successful tick update
+              if (allRead) {
+                console.log('🎉 Message fully read - ticks should now be BLUE with animation!');
+              } else if (readCount > 0) {
+                console.log('📈 Partial read progress - ticks remain GREY but with updated count');
+              }
             }
           }
         }
@@ -523,30 +551,64 @@ const MessageList: React.FC<MessageListProps> = ({
                     <p className="text-xs opacity-70">
                       {new Date(message.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
-                    {/* Simple read status ticks - only show for sender's messages */}
+                    {/* Real-time read status ticks - only show for sender's messages */}
                     {message.sender_id === user?.user_id && (
                       <div className="flex items-center ml-1">
-                        {message.read_status && message.read_status.length > 0 && message.read_status.every(status => status.is_read) ? (
-                          // All read - blue double tick
-                          <div className="flex items-center text-blue-500" title="Read">
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                            <svg className="w-4 h-4 -ml-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                          </div>
-                        ) : (
-                          // Not read - gray double tick
-                          <div className="flex items-center text-gray-400" title="Delivered">
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                            <svg className="w-4 h-4 -ml-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                          </div>
-                        )}
+                        {(() => {
+                          // Calculate read status for real-time updates
+                          const readStatus = message.read_status || [];
+                          const totalRecipients = readStatus.length;
+                          const readCount = readStatus.filter(status => status.is_read).length;
+                          const allRead = totalRecipients > 0 && readStatus.every(status => status.is_read);
+                          const someRead = readCount > 0;
+
+                          if (allRead) {
+                            // All read - blue double tick with animation
+                            return (
+                              <div
+                                className="flex items-center text-blue-500 transition-colors duration-300"
+                                title={`Read by all (${readCount}/${totalRecipients})`}
+                              >
+                                <svg className="w-4 h-4 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                                <svg className="w-4 h-4 -ml-1 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                            );
+                          } else if (someRead) {
+                            // Partially read - gray double tick with count
+                            return (
+                              <div
+                                className="flex items-center text-gray-400 transition-colors duration-300"
+                                title={`Read by ${readCount} of ${totalRecipients} recipients`}
+                              >
+                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                                <svg className="w-4 h-4 -ml-1" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                            );
+                          } else {
+                            // Not read - gray double tick (delivered)
+                            return (
+                              <div
+                                className="flex items-center text-gray-400 transition-colors duration-300"
+                                title={totalRecipients > 0 ? `Delivered to ${totalRecipients} recipients` : "Delivered"}
+                              >
+                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                                <svg className="w-4 h-4 -ml-1" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                            );
+                          }
+                        })()}
                       </div>
                     )}
                   </div>

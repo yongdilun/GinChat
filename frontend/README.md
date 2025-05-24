@@ -319,7 +319,15 @@ The application checks for backend availability using the `/health` endpoint.
 
 ## Recent Updates & Improvements
 
-### WebSocket & Connection Stability (Latest)
+### Real-time Read Status Fix & Testing (Latest)
+- **Fixed Real-time Updates**: Resolved issue where grey/blue ticks weren't updating in real-time
+- **Enhanced WebSocket Handling**: Improved `message_read` event processing for instant tick updates
+- **Manual Testing Features**: Added click-to-mark-read functionality for testing real-time updates
+- **Extended Auto-Mark Delay**: Increased delay to 10 seconds to allow testing of real-time features
+- **Debug Logging**: Added comprehensive logging to track real-time read status updates
+- **Instant Synchronization**: All users now see read status changes immediately via WebSocket
+
+### WebSocket & Connection Stability (Previous)
 - **Simplified Auto-Mark Logic**: Removed complex frontend auto-marking to prevent connection issues
 - **Enhanced Error Handling**: Improved API error handling with better user feedback
 - **Connection Optimization**: Reduced API timeout from 15s to 10s for better responsiveness
