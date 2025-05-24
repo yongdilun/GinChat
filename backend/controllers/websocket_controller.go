@@ -13,10 +13,42 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// SafeWebSocketConn wraps a WebSocket connection with a mutex for thread-safe writes
+type SafeWebSocketConn struct {
+	conn *websocket.Conn
+	mu   sync.Mutex
+}
+
+// NewSafeWebSocketConn creates a new thread-safe WebSocket connection wrapper
+func NewSafeWebSocketConn(conn *websocket.Conn) *SafeWebSocketConn {
+	return &SafeWebSocketConn{
+		conn: conn,
+	}
+}
+
+// WriteMessage safely writes a message to the WebSocket connection
+func (s *SafeWebSocketConn) WriteMessage(messageType int, data []byte) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.conn.WriteMessage(messageType, data)
+}
+
+// Close safely closes the WebSocket connection
+func (s *SafeWebSocketConn) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.conn.Close()
+}
+
+// ReadMessage reads a message from the WebSocket connection (no mutex needed for reads)
+func (s *SafeWebSocketConn) ReadMessage() (messageType int, p []byte, err error) {
+	return s.conn.ReadMessage()
+}
+
 // WebSocketController handles WebSocket connections
 type WebSocketController struct {
-	clients               map[uint]map[*websocket.Conn]bool
-	rooms                 map[string]map[*websocket.Conn]bool
+	clients               map[uint]map[*SafeWebSocketConn]bool
+	rooms                 map[string]map[*SafeWebSocketConn]bool
 	clientsMux            sync.RWMutex
 	broadcast             chan []byte
 	logger                *logrus.Logger
@@ -31,8 +63,8 @@ var GlobalWebSocketController *WebSocketController
 // NewWebSocketController creates a new WebSocketController
 func NewWebSocketController(logger *logrus.Logger) *WebSocketController {
 	controller := &WebSocketController{
-		clients:            make(map[uint]map[*websocket.Conn]bool),
-		rooms:              make(map[string]map[*websocket.Conn]bool),
+		clients:            make(map[uint]map[*SafeWebSocketConn]bool),
+		rooms:              make(map[string]map[*SafeWebSocketConn]bool),
 		broadcast:          make(chan []byte),
 		logger:             logger,
 		processedMessages:  make(map[string]map[string]bool),
@@ -114,16 +146,16 @@ func (wsc *WebSocketController) HandleConnection(c *gin.Context) {
 	wsc.clientsMux.Lock()
 	if conns, ok := wsc.clients[uid]; ok {
 		// Close all existing connections for this user
-		for conn := range conns {
+		for safeConn := range conns {
 			// Remove from room
 			for r, clients := range wsc.rooms {
-				delete(clients, conn)
+				delete(clients, safeConn)
 				if len(clients) == 0 {
 					delete(wsc.rooms, r)
 				}
 			}
 			// Close the connection
-			conn.Close()
+			safeConn.Close()
 		}
 		// Clear all connections for this user
 		delete(wsc.clients, uid)
@@ -131,22 +163,25 @@ func (wsc *WebSocketController) HandleConnection(c *gin.Context) {
 	wsc.clientsMux.Unlock()
 
 	// Upgrade HTTP connection to WebSocket
-	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	rawConn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		// Connection upgrade failed
 		return
 	}
 
+	// Wrap in SafeWebSocketConn
+	conn := NewSafeWebSocketConn(rawConn)
+
 	// Register client
 	wsc.clientsMux.Lock()
 	if _, ok := wsc.clients[uid]; !ok {
-		wsc.clients[uid] = make(map[*websocket.Conn]bool)
+		wsc.clients[uid] = make(map[*SafeWebSocketConn]bool)
 	}
 	wsc.clients[uid][conn] = true
 
 	// Register client in the room
 	if _, ok := wsc.rooms[roomID]; !ok {
-		wsc.rooms[roomID] = make(map[*websocket.Conn]bool)
+		wsc.rooms[roomID] = make(map[*SafeWebSocketConn]bool)
 	}
 	wsc.rooms[roomID][conn] = true
 	wsc.clientsMux.Unlock()
@@ -262,16 +297,19 @@ func (wsc *WebSocketController) HandleSimpleConnection(c *gin.Context) {
 	}
 
 	// Upgrade HTTP connection to WebSocket
-	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	rawConn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		wsc.logger.Errorf("Failed to upgrade WebSocket connection: %v", err)
 		return
 	}
 
+	// Wrap in SafeWebSocketConn
+	conn := NewSafeWebSocketConn(rawConn)
+
 	// Register client for sidebar updates (no specific room)
 	wsc.clientsMux.Lock()
 	if _, ok := wsc.clients[uid]; !ok {
-		wsc.clients[uid] = make(map[*websocket.Conn]bool)
+		wsc.clients[uid] = make(map[*SafeWebSocketConn]bool)
 	}
 	wsc.clients[uid][conn] = true
 	wsc.clientsMux.Unlock()
@@ -400,7 +438,7 @@ func (wsc *WebSocketController) cleanupConnectionAttempts() {
 }
 
 // pingClient sends periodic pings to keep the connection alive
-func (wsc *WebSocketController) pingClient(conn *websocket.Conn, _ uint) {
+func (wsc *WebSocketController) pingClient(conn *SafeWebSocketConn, _ uint) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
