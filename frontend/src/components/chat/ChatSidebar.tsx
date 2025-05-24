@@ -13,6 +13,7 @@ interface ChatSidebarProps {
   onSelectChatroom: (chatroom: Chatroom) => void;
   onChatroomsRefresh: () => void;
   onDeleteChatroom?: (chatroomId: string) => void;
+  refreshTrigger?: number; // Add this to trigger refresh from parent
 }
 
 // Replace LogoutIcon with inline SVG
@@ -50,6 +51,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
   onSelectChatroom,
   onChatroomsRefresh,
   onDeleteChatroom,
+  refreshTrigger,
 }) => {
   const router = useRouter();
   const [showChatroomOptions, setShowChatroomOptions] = useState(false);
@@ -90,6 +92,9 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
         messageReadStatusAPI.getUnreadCounts(),
       ]);
 
+      console.log('Latest messages response:', latestResponse.data);
+      console.log('Unread counts response:', unreadResponse.data);
+
       setLatestMessages(latestResponse.data || []);
       setUnreadCounts(unreadResponse.data || []);
     } catch (error) {
@@ -105,6 +110,13 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
     fetchLatestMessagesAndCounts();
   }, [chatrooms, user, fetchLatestMessagesAndCounts]);
 
+  // Refresh when parent triggers refresh
+  useEffect(() => {
+    if (refreshTrigger) {
+      fetchLatestMessagesAndCounts();
+    }
+  }, [refreshTrigger, fetchLatestMessagesAndCounts]);
+
   // Helper function to get latest message for a chatroom
   const getLatestMessageForChatroom = (chatroomId: string) => {
     if (!latestMessages || !Array.isArray(latestMessages)) return null;
@@ -113,8 +125,12 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
 
   // Helper function to get unread count for a chatroom
   const getUnreadCountForChatroom = (chatroomId: string) => {
-    if (!unreadCounts || !Array.isArray(unreadCounts)) return 0;
+    if (!unreadCounts || !Array.isArray(unreadCounts)) {
+      console.log('No unread counts available:', unreadCounts);
+      return 0;
+    }
     const unreadData = unreadCounts.find(count => count.chatroom_id === chatroomId);
+    console.log(`Unread count for chatroom ${chatroomId}:`, unreadData?.unread_count || 0);
     return unreadData?.unread_count || 0;
   };
 
@@ -331,15 +347,29 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
         </div>
 
         {!isSidebarCollapsed && (
-          <motion.button
-            onClick={handleLogout}
-            className="mt-3 w-full px-3 py-2 flex items-center justify-center text-sm text-white bg-red-500 rounded-md hover:bg-red-600 transition-colors"
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
-          >
-            <LogoutIcon className="w-4 h-4 mr-2" />
-            Logout
-          </motion.button>
+          <div className="mt-3 space-y-2">
+            <motion.button
+              onClick={fetchLatestMessagesAndCounts}
+              className="w-full px-3 py-2 flex items-center justify-center text-sm text-white bg-blue-500 rounded-md hover:bg-blue-600 transition-colors"
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+            >
+              🔄 Refresh Counts
+            </motion.button>
+            <div className="text-xs text-gray-500 p-2 bg-gray-100 rounded">
+              <p>Debug: Unread counts: {unreadCounts.length}</p>
+              <p>Latest messages: {latestMessages.length}</p>
+            </div>
+            <motion.button
+              onClick={handleLogout}
+              className="w-full px-3 py-2 flex items-center justify-center text-sm text-white bg-red-500 rounded-md hover:bg-red-600 transition-colors"
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+            >
+              <LogoutIcon className="w-4 h-4 mr-2" />
+              Logout
+            </motion.button>
+          </div>
         )}
 
         {isSidebarCollapsed && (

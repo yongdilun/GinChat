@@ -1,6 +1,6 @@
 # GinChat Backend
 
-A robust real-time chat application backend built with Go, Gin framework, GORM, and MongoDB.
+A robust real-time chat application backend built with Go, Gin framework, GORM, and MongoDB with comprehensive message read status tracking and blue tick system.
 
 ## Tech Stack
 
@@ -63,11 +63,18 @@ backend/
 
 - **RESTful API**: Clean API design following REST principles
 - **Real-time Messaging**: WebSocket support for instant messaging
+- **Message Read Status**: Complete blue tick system with read/unread tracking
+  - Individual message read status tracking
+  - Unread message counts per chatroom
+  - Latest message tracking for chatroom overview
+  - Auto-mark messages as read functionality
+  - First unread message navigation
 - **Authentication**: Secure JWT-based authentication
 - **Password Security**: bcrypt hashing with automatic salting
+- **Chatroom Management**: Room codes, passwords, and member management
 - **Database Integration**:
   - MySQL for user data and authentication
-  - MongoDB for chat data (messages, chatrooms)
+  - MongoDB for chat data (messages, chatrooms, read status)
 - **Media Handling**: Support for uploading media files to Cloudinary cloud storage
 - **API Documentation**: Swagger UI for interactive API documentation
 - **Structured Logging**: JSON-formatted logs with logrus
@@ -369,6 +376,179 @@ All endpoints below require `Authorization: Bearer <token>` header.
     "media_url": "https://res.cloudinary.com/your-cloud/image/upload/v123456789/abc123.jpg",
     "file_name": "abc123.jpg",
     "message_type": "picture"
+  }
+  ```
+
+### Message Read Status (Auth Required)
+
+#### Mark Message as Read
+- **POST** `/api/messages/read`
+- **Description**: Mark a specific message as read by the authenticated user
+- **Headers**: `Authorization: Bearer <token>`
+- **Request Body**:
+  ```json
+  {
+    "message_id": "60d5f8b8e6b5f0b3e8b4b5b4"
+  }
+  ```
+- **Response**: `200 OK`
+  ```json
+  {
+    "message": "Message marked as read successfully"
+  }
+  ```
+
+#### Mark Multiple Messages as Read
+- **POST** `/api/messages/read-multiple`
+- **Description**: Mark multiple messages as read by the authenticated user
+- **Headers**: `Authorization: Bearer <token>`
+- **Request Body**:
+  ```json
+  ["60d5f8b8e6b5f0b3e8b4b5b4", "60d5f8b8e6b5f0b3e8b4b5b5"]
+  ```
+- **Response**: `200 OK`
+  ```json
+  {
+    "message": "Messages marked as read successfully"
+  }
+  ```
+
+#### Get Unread Counts
+- **GET** `/api/messages/unread-counts`
+- **Description**: Get unread message counts for all chatrooms the user has joined
+- **Headers**: `Authorization: Bearer <token>`
+- **Response**: `200 OK`
+  ```json
+  [
+    {
+      "chatroom_id": "60d5f8b8e6b5f0b3e8b4b5b3",
+      "chatroom_name": "General Chat",
+      "unread_count": 5
+    }
+  ]
+  ```
+
+#### Get Latest Messages
+- **GET** `/api/messages/latest`
+- **Description**: Get the latest message for each chatroom the user has joined
+- **Headers**: `Authorization: Bearer <token>`
+- **Response**: `200 OK`
+  ```json
+  [
+    {
+      "chatroom_id": "60d5f8b8e6b5f0b3e8b4b5b3",
+      "chatroom_name": "General Chat",
+      "message_id": "60d5f8b8e6b5f0b3e8b4b5b4",
+      "sender_name": "john_doe",
+      "message_type": "text",
+      "text_content": "Hello everyone!",
+      "sent_at": "2024-01-01T00:00:00Z",
+      "read_status": [
+        {
+          "user_id": 1,
+          "username": "john_doe",
+          "is_read": true,
+          "read_at": "2024-01-01T00:00:00Z"
+        }
+      ]
+    }
+  ]
+  ```
+
+#### Get Message Read Status
+- **GET** `/api/messages/:message_id/read-status`
+- **Description**: Get read status information for a specific message
+- **Headers**: `Authorization: Bearer <token>`
+- **Parameters**: `message_id` (string) - Message ObjectID
+- **Response**: `200 OK`
+  ```json
+  [
+    {
+      "user_id": 1,
+      "username": "john_doe",
+      "is_read": true,
+      "read_at": "2024-01-01T00:00:00Z"
+    }
+  ]
+  ```
+
+#### Get Detailed Read Status
+- **GET** `/api/messages/:message_id/read-by-who`
+- **Description**: Get detailed information about who has read a specific message
+- **Headers**: `Authorization: Bearer <token>`
+- **Parameters**: `message_id` (string) - Message ObjectID
+- **Response**: `200 OK`
+  ```json
+  [
+    {
+      "id": "60d5f8b8e6b5f0b3e8b4b5b6",
+      "message_id": "60d5f8b8e6b5f0b3e8b4b5b4",
+      "chatroom_id": "60d5f8b8e6b5f0b3e8b4b5b3",
+      "sender_id": 1,
+      "recipient_id": 2,
+      "is_read": true,
+      "read_at": "2024-01-01T00:00:00Z",
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  ]
+  ```
+
+#### Get User's Last Read Message
+- **GET** `/api/chatrooms/:id/last-read`
+- **Description**: Get the last message that the authenticated user has read in a specific chatroom
+- **Headers**: `Authorization: Bearer <token>`
+- **Parameters**: `id` (string) - Chatroom ObjectID
+- **Response**: `200 OK`
+  ```json
+  {
+    "id": "60d5f8b8e6b5f0b3e8b4b5b7",
+    "chatroom_id": "60d5f8b8e6b5f0b3e8b4b5b3",
+    "user_id": 1,
+    "message_id": "60d5f8b8e6b5f0b3e8b4b5b4",
+    "read_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  }
+  ```
+
+#### Mark All Messages in Chatroom as Read
+- **POST** `/api/chatrooms/:id/mark-all-read`
+- **Description**: Mark all unread messages in a specific chatroom as read for the authenticated user
+- **Headers**: `Authorization: Bearer <token>`
+- **Parameters**: `id` (string) - Chatroom ObjectID
+- **Response**: `200 OK`
+  ```json
+  {
+    "message": "All messages marked as read successfully"
+  }
+  ```
+
+#### Get First Unread Message
+- **GET** `/api/chatrooms/:id/first-unread`
+- **Description**: Get the first unread message for the authenticated user in a specific chatroom
+- **Headers**: `Authorization: Bearer <token>`
+- **Parameters**: `id` (string) - Chatroom ObjectID
+- **Response**: `200 OK`
+  ```json
+  {
+    "id": "60d5f8b8e6b5f0b3e8b4b5b4",
+    "chatroom_id": "60d5f8b8e6b5f0b3e8b4b5b3",
+    "sender_id": 1,
+    "sender_name": "john_doe",
+    "message_type": "text",
+    "text_content": "Hello everyone!",
+    "sent_at": "2024-01-01T00:00:00Z"
+  }
+  ```
+
+#### Get Unread Count for Specific Chatroom
+- **GET** `/api/chatrooms/:id/unread-count`
+- **Description**: Get unread message count for the authenticated user in a specific chatroom
+- **Headers**: `Authorization: Bearer <token>`
+- **Parameters**: `id` (string) - Chatroom ObjectID
+- **Response**: `200 OK`
+  ```json
+  {
+    "unread_count": 5
   }
   ```
 

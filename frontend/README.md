@@ -1,6 +1,6 @@
 # GinChat Frontend
 
-A modern real-time chat application frontend built with React, Next.js, TypeScript, and Tailwind CSS.
+A modern real-time chat application frontend built with React, Next.js, TypeScript, and Tailwind CSS with comprehensive message read status tracking and blue tick system.
 
 ## Tech Stack
 
@@ -12,7 +12,7 @@ A modern real-time chat application frontend built with React, Next.js, TypeScri
 - **Form Handling**: [React Hook Form](https://react-hook-form.com/) (v7.50.0)
 - **Data Fetching**: [React Query](https://react-query.tanstack.com/) (v3.39.3)
 - **WebSocket Client**: [Socket.IO Client](https://socket.io/docs/v4/client-api/) (v4.7.4)
-- **UI Components**: 
+- **UI Components**:
   - [Heroicons](https://heroicons.com/) (v1.0.6)
   - [React Icons](https://react-icons.github.io/react-icons/) (v5.0.1)
 - **Animations**: [Framer Motion](https://www.framer.com/motion/) (v12.12.1)
@@ -58,7 +58,16 @@ frontend/
 - **Type-Safe Development**: Full TypeScript integration for better developer experience and code quality
 - **Responsive UI with Tailwind CSS**: Fully responsive design using utility-first CSS framework
 - **Real-time Communication**: WebSocket integration for instant messaging
+- **Message Read Status System**: Complete blue tick implementation
+  - Unread message count indicators in sidebar
+  - Latest message preview for each chatroom
+  - Auto-navigation to first unread message
+  - Auto-mark messages as read when entering chatroom
+  - Info button to view detailed read status
+  - "Unread messages" label for navigation
 - **Authentication**: JWT-based authentication with secure token handling
+- **Chatroom Management**: Room codes, passwords, and member management
+- **Media Support**: Upload and share images, audio, and video files
 - **Form Validation**: Client-side validation using React Hook Form
 - **API Integration**: Axios for REST API communication with the backend
 - **Error Handling**: Comprehensive error handling with dedicated error boundaries
@@ -106,6 +115,32 @@ The application supports various message types:
 - `text_and_picture`: Text with image
 - `text_and_audio`: Text with audio
 - `text_and_video`: Text with video
+
+## Message Read Status Features
+
+### Sidebar Enhancements
+- **Unread Count Badges**: Red circular badges showing unread message count for each chatroom
+- **Latest Message Preview**: Shows the most recent message with smart truncation and media type icons
+- **Responsive Design**: Adapts to both expanded and collapsed sidebar states
+- **Real-time Updates**: Automatically refreshes when new messages arrive
+
+### Message List Features
+- **Auto-Navigation**: Automatically scrolls to the first unread message when entering a chatroom
+- **Unread Messages Label**: Blue floating label appears above the oldest unread message for easy identification
+- **Auto-Mark as Read**: Messages are automatically marked as read after 2 seconds in the chatroom
+- **Clean Visual Design**: No highlighting or rings, just the unread label for clear indication
+
+### Message Actions
+- **Info Button**: Green info button available on all messages (not just sender's messages)
+- **Read Status Modal**: Shows detailed information about who has read each message
+- **Permission-Based Actions**: Edit and delete buttons only appear for message senders
+- **Real-time Data**: Read status information is fetched live from the backend
+
+### UI/UX Improvements
+- **Animated Badges**: Unread count badges have subtle pulse animation
+- **Smart Truncation**: Long messages are truncated with "..." for better layout
+- **Media Type Icons**: Different icons for photos (📷), audio (🎵), and video (🎥)
+- **Loading States**: Proper loading indicators while fetching read status data
 
 ## Getting Started
 
