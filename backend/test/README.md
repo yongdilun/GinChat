@@ -1,12 +1,16 @@
-# GinChat Test Database Initialization
+# GinChat Database Initialization
 
-This directory contains code to initialize the MySQL and MongoDB databases with test data for the GinChat application.
+This directory contains the database initialization script for the GinChat application.
+
+## ⚠️ WARNING
+
+**The `init_db.go` script will completely clear ALL existing data in both MySQL and MongoDB databases!**
 
 ## Overview
 
-The test environment consists of:
+The initialization script:
 
-- `init_db.go` - A standalone Go program that initializes both MySQL and MongoDB databases with test data
+- `init_db.go` - A standalone Go program that clears all existing data and creates fresh database schema
 
 ## Prerequisites
 
@@ -14,63 +18,110 @@ The test environment consists of:
 - MongoDB server running
 - Go 1.16+
 
-## Setup
+## Environment Variables
 
-1. Make sure you have a `.env` file in the backend directory with your database credentials:
+The script reads environment variables from:
+1. `backend/test/.env` (if exists)
+2. `backend/.env` (fallback)
+3. System environment variables (final fallback)
 
-```
-# MySQL Configuration
-MYSQL_HOST=localhost
-MYSQL_PORT=3306
+### Configuration Options:
+
+**MySQL (choose one approach):**
+```bash
+# Option 1: Full URI (recommended for cloud databases)
+MYSQL_URI=mysql://username:password@host:port/database?ssl-mode=REQUIRED
+
+# Option 2: Individual parameters (for local development)
 MYSQL_USER=root
 MYSQL_PASSWORD=password
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
 MYSQL_DATABASE=ginchat
+```
 
-# MongoDB Configuration
+**MongoDB (choose one approach):**
+```bash
+# Option 1: Full URI (recommended for MongoDB Atlas)
+MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/database
+
+# Option 2: Individual parameters (for local development)
 MONGO_HOST=localhost
 MONGO_PORT=27017
 MONGO_DATABASE=ginchat
-# MONGO_USER=root       # Optional for local MongoDB without authentication
-# MONGO_PASSWORD=password  # Optional for local MongoDB without authentication
 ```
 
-2. Run the database initialization:
+## Usage
+
+**⚠️ WARNING: This will delete all existing data!**
 
 ```bash
 cd test
 go run init_db.go
 ```
 
-The initialization script will read the `.env` file from the parent directory (backend/.env).
+Or from the backend directory:
+```bash
+go run test/init_db.go
+```
 
 ## What it does
 
-The initialization code will:
+The initialization script will:
 
-1. Connect to the MySQL database
-2. Create the `users` table if it doesn't exist
-3. Create test users if they don't exist
-4. Connect to the MongoDB database
-5. Create the `chatrooms` and `messages` collections if they don't exist
-6. Create test chatrooms and messages if they don't exist
+### MySQL Operations:
+1. Connect to MySQL database
+2. **Drop the `users` table** if it exists (⚠️ **DATA LOSS**)
+3. Create fresh `users` table with current schema
+4. Apply all GORM migrations
 
-## Test Data
+### MongoDB Operations:
+1. Connect to MongoDB database
+2. **Drop existing collections**: `chatrooms`, `messages`, `chatroom_members` (⚠️ **DATA LOSS**)
+3. Create fresh empty collections
+4. Prepare collections for application use
 
-### MySQL
+## Expected Output
 
-The following test users will be created:
+```
+=== GinChat Database Initialization ===
+WARNING: This will clear ALL existing data in both MySQL and MongoDB!
+========================================
+Loaded environment variables from ../.env
+Connected to MySQL database successfully
+Clearing all MySQL data...
+Dropping existing users table
+Schema migration completed
+MySQL database initialization completed - ready for use
+Connected to MongoDB database successfully
+Clearing all MongoDB data...
+Dropping existing collection: chatrooms
+Dropping existing collection: messages
+Creating fresh MongoDB collections...
+Created chatrooms collection
+Created messages collection
+Created chatroom_members collection
+MongoDB database initialization completed - ready for use
+========================================
+✅ Database initialization completed successfully!
+✅ All existing data has been cleared
+✅ Fresh database schema created
+✅ Ready for application use
+========================================
+```
 
-1. Username: `testuser1`, Email: `test1@example.com`, Password: `password123`
-2. Username: `testuser2`, Email: `test2@example.com`, Password: `password123`
-3. Username: `admin`, Email: `admin@example.com`, Password: `password123`
+## When to Use
 
-### MongoDB
+- **Development**: Reset your local database to a clean state
+- **Testing**: Before running integration tests that require a clean database
+- **Deployment**: Setting up a new environment
+- **Schema Updates**: After making changes to database models
 
-The following test chatrooms will be created:
+## Safety Notes
 
-1. Name: `General`, Created by: `testuser1`
-2. Name: `Random`, Created by: `testuser2`
-
-Each chatroom will have some test messages.
+- **NEVER run this script against production databases**
+- Always backup important data before running
+- Verify your environment variables point to the correct databases
+- The script will show which database it's connecting to in the logs
 
 
