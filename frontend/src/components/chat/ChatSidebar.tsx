@@ -94,6 +94,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
 
       console.log('Latest messages response:', latestResponse.data);
       console.log('Unread counts response:', unreadResponse.data);
+      console.log('Unread counts structure:', JSON.stringify(unreadResponse.data, null, 2));
 
       setLatestMessages(latestResponse.data || []);
       setUnreadCounts(unreadResponse.data || []);
@@ -129,9 +130,13 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
       console.log('No unread counts available:', unreadCounts);
       return 0;
     }
+    console.log(`Looking for unread count for chatroom ${chatroomId}`);
+    console.log('Available unread counts:', unreadCounts);
     const unreadData = unreadCounts.find(count => count.chatroom_id === chatroomId);
-    console.log(`Unread count for chatroom ${chatroomId}:`, unreadData?.unread_count || 0);
-    return unreadData?.unread_count || 0;
+    console.log(`Found unread data:`, unreadData);
+    const count = unreadData?.unread_count || 0;
+    console.log(`Final unread count for chatroom ${chatroomId}:`, count);
+    return count;
   };
 
   // Helper function to format latest message text
@@ -356,9 +361,19 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
             >
               🔄 Refresh Counts
             </motion.button>
-            <div className="text-xs text-gray-500 p-2 bg-gray-100 rounded">
+            <div className="text-xs text-gray-500 p-2 bg-gray-100 rounded max-h-32 overflow-y-auto">
               <p>Debug: Unread counts: {unreadCounts.length}</p>
               <p>Latest messages: {latestMessages.length}</p>
+              {unreadCounts.length > 0 && (
+                <div className="mt-1">
+                  <p className="font-semibold">Unread data:</p>
+                  {unreadCounts.map((count, index) => (
+                    <p key={index} className="text-xs">
+                      {count.chatroom_name}: {count.unread_count} unread
+                    </p>
+                  ))}
+                </div>
+              )}
             </div>
             <motion.button
               onClick={handleLogout}
@@ -702,7 +717,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                           <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold">
                             {chatroom.name.charAt(0).toUpperCase()}
                           </div>
-                          {isSidebarCollapsed && getUnreadCountForChatroom(chatroom.id) > 0 && (
+                          {isSidebarCollapsed && (
                             <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold shadow-lg animate-pulse border-2 border-white">
                               {getUnreadCountForChatroom(chatroom.id) > 99 ? '99+' : getUnreadCountForChatroom(chatroom.id)}
                             </div>
@@ -721,11 +736,10 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                                   </svg>
                                 )}
                               </div>
-                              {getUnreadCountForChatroom(chatroom.id) > 0 && (
-                                <div className="bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-[24px] h-6 flex items-center justify-center font-bold shadow-lg animate-pulse">
-                                  {getUnreadCountForChatroom(chatroom.id) > 99 ? '99+' : getUnreadCountForChatroom(chatroom.id)}
-                                </div>
-                              )}
+                              {/* Always show badge for debugging */}
+                              <div className="bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-[24px] h-6 flex items-center justify-center font-bold shadow-lg animate-pulse">
+                                {getUnreadCountForChatroom(chatroom.id) > 99 ? '99+' : getUnreadCountForChatroom(chatroom.id)}
+                              </div>
                             </div>
                             <div className="mt-1">
                               <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
