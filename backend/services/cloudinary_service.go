@@ -114,38 +114,41 @@ func (s *CloudinaryService) DeleteFile(mediaURL string) error {
 		return nil // No media to delete
 	}
 
-	// Extract public ID and resource type from Cloudinary URL
-	publicID, resourceType, err := s.extractPublicIDAndResourceTypeFromURL(mediaURL)
+	// Extract public ID from Cloudinary URL
+	publicID, err := s.extractPublicIDFromURL(mediaURL)
 	if err != nil {
 		// Log the error but don't fail the operation
-		// This allows the message/chatroom deletion to continue even if media deletion fails
 		return nil
 	}
 
-	// Delete from Cloudinary with the correct resource type
-	_, err = s.Cld.Upload.Destroy(context.Background(), uploader.DestroyParams{
-		PublicID:     publicID,
-		ResourceType: resourceType,
-	})
-	if err != nil {
-		// Log the error but don't fail the operation
-		// This allows the message/chatroom deletion to continue even if media deletion fails
-		return nil
+	// Try deleting with different resource types since we can't always determine the exact type
+	resourceTypes := []string{"image", "video", "raw"}
+
+	for _, resourceType := range resourceTypes {
+		_, err = s.Cld.Upload.Destroy(context.Background(), uploader.DestroyParams{
+			PublicID:     publicID,
+			ResourceType: resourceType,
+		})
+		if err == nil {
+			// Successfully deleted
+			return nil
+		}
 	}
 
+	// If all attempts failed, log but don't fail the operation
 	return nil
 }
 
-// extractPublicIDAndResourceTypeFromURL extracts the public ID and resource type from a Cloudinary URL
-func (s *CloudinaryService) extractPublicIDAndResourceTypeFromURL(mediaURL string) (string, string, error) {
+// extractPublicIDFromURL extracts the public ID from a Cloudinary URL
+func (s *CloudinaryService) extractPublicIDFromURL(mediaURL string) (string, error) {
 	if mediaURL == "" {
-		return "", "", errors.New("empty media URL")
+		return "", errors.New("empty media URL")
 	}
 
 	// Parse the URL
 	parsedURL, err := url.Parse(mediaURL)
 	if err != nil {
-		return "", "", errors.New("invalid media URL")
+		return "", errors.New("invalid media URL")
 	}
 
 	// Extract path and remove leading slash
@@ -154,41 +157,33 @@ func (s *CloudinaryService) extractPublicIDAndResourceTypeFromURL(mediaURL strin
 	// Split path by '/'
 	parts := strings.Split(path, "/")
 	if len(parts) < 4 {
-		return "", "", errors.New("invalid Cloudinary URL format")
+		return "", errors.New("invalid Cloudinary URL format")
 	}
 
 	// For Cloudinary URLs, the format is typically:
 	// /{cloud_name}/{resource_type}/{type}/{version}/{public_id}.{format}
 	// or /{cloud_name}/{resource_type}/{type}/{public_id}.{format}
 
-	// Extract resource type (second part after cloud name)
-	resourceType := parts[1]
+	// Find the public ID part (everything after the first 3 parts)
+	publicIDParts := parts[3:]
 
-	// Find the public ID (last part without extension)
-	lastPart := parts[len(parts)-1]
+	// Join all parts except remove extension from the last part
+	if len(publicIDParts) > 0 {
+		lastPart := publicIDParts[len(publicIDParts)-1]
 
-	// Remove file extension
-	if dotIndex := strings.LastIndex(lastPart, "."); dotIndex != -1 {
-		lastPart = lastPart[:dotIndex]
-	}
+		// Remove file extension
+		if dotIndex := strings.LastIndex(lastPart, "."); dotIndex != -1 {
+			lastPart = lastPart[:dotIndex]
+		}
 
-	// Reconstruct public ID with folder structure
-	// Skip cloud_name, resource_type, and type (first 3 parts)
-	if len(parts) > 4 {
-		// Has version or folder structure
-		publicIDParts := parts[3:]
+		// Replace the last part without extension
 		publicIDParts[len(publicIDParts)-1] = lastPart
-		return strings.Join(publicIDParts, "/"), resourceType, nil
-	} else {
-		// Simple public ID
-		return lastPart, resourceType, nil
-	}
-}
 
-// extractPublicIDFromURL extracts the public ID from a Cloudinary URL (legacy function)
-func (s *CloudinaryService) extractPublicIDFromURL(mediaURL string) (string, error) {
-	publicID, _, err := s.extractPublicIDAndResourceTypeFromURL(mediaURL)
-	return publicID, err
+		// Join all parts to form the public ID
+		return strings.Join(publicIDParts, "/"), nil
+	}
+
+	return "", errors.New("could not extract public ID")
 }
 
 // getResourceType returns the Cloudinary resource type for a specific media type
