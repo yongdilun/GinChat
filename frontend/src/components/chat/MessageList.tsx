@@ -56,7 +56,7 @@ const MessageList: React.FC<MessageListProps> = ({
 
   // Handle WebSocket messages for real-time updates
   useEffect(() => {
-    if (!lastMessage || !selectedChatroom) return;
+    if (!lastMessage || !selectedChatroom || !user) return;
 
     switch (lastMessage.type) {
       case 'new_message':
@@ -64,7 +64,20 @@ const MessageList: React.FC<MessageListProps> = ({
         if (lastMessage.chatroom_id === selectedChatroom.id) {
           console.log('New message received via WebSocket:', lastMessage.data);
           if (onNewMessage && lastMessage.data) {
-            onNewMessage(lastMessage.data as Message);
+            const newMessage = lastMessage.data as Message;
+            onNewMessage(newMessage);
+
+            // Auto-mark new message as read if it's not from the current user
+            if (newMessage.sender_id !== user.user_id) {
+              setTimeout(async () => {
+                try {
+                  await messageReadStatusAPI.markMessageAsRead(newMessage.id);
+                  console.log('Auto-marked new WebSocket message as read:', newMessage.id);
+                } catch (error) {
+                  console.error('Failed to auto-mark new WebSocket message as read:', error);
+                }
+              }, 1000); // Mark as read after 1 second
+            }
           }
           // Auto-scroll to bottom for new messages
           setTimeout(() => {
@@ -96,9 +109,9 @@ const MessageList: React.FC<MessageListProps> = ({
         // Handle other message types if needed
         break;
     }
-  }, [lastMessage, selectedChatroom, onNewMessage, onMessageReadStatusUpdate, onRefreshMessages]);
+  }, [lastMessage, selectedChatroom, onNewMessage, onMessageReadStatusUpdate, onRefreshMessages, user]);
 
-  // Get first unread message and auto-scroll to it when chatroom changes
+  // Get first unread message and auto-scroll to it when chatroom changes (but not when messages change)
   useEffect(() => {
     if (!selectedChatroom || !user) return;
 
@@ -134,10 +147,9 @@ const MessageList: React.FC<MessageListProps> = ({
       }
     };
 
-    if (messages.length > 0) {
-      getFirstUnreadAndScroll();
-    }
-  }, [selectedChatroom, user, messages]);
+    // Only run when chatroom changes, not when messages change
+    getFirstUnreadAndScroll();
+  }, [selectedChatroom?.id, user?.user_id]); // Removed messages dependency
 
   // Auto-mark all messages as read when entering chatroom
   useEffect(() => {
@@ -146,6 +158,10 @@ const MessageList: React.FC<MessageListProps> = ({
     const markAllAsRead = async () => {
       try {
         await messageReadStatusAPI.markAllMessagesAsRead(selectedChatroom.id);
+        // Clear the unread message label after marking as read
+        setTimeout(() => {
+          setFirstUnreadMessageId(null);
+        }, 1000);
       } catch (error) {
         console.error('Failed to mark messages as read:', error);
       }
