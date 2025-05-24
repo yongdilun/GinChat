@@ -75,16 +75,12 @@ const MessageList: React.FC<MessageListProps> = ({
         break;
 
       case 'message_read':
-        // Check if the read status update is for the current chatroom
+        // Handle real-time read status updates
         if (lastMessage.chatroom_id === selectedChatroom.id) {
           console.log('Message read status update via WebSocket:', lastMessage.data);
           if (onMessageReadStatusUpdate && lastMessage.data) {
-            const data = lastMessage.data as { message_id?: string; read_status?: unknown };
-            if (data.message_id && data.read_status) {
-              // Type guard to ensure readStatus is the correct type
-              const typedReadStatus = Array.isArray(data.read_status) ? data.read_status as ReadInfo[] : [];
-              onMessageReadStatusUpdate(data.message_id, typedReadStatus);
-            }
+            const data = lastMessage.data as any;
+            onMessageReadStatusUpdate(data.message_id, data.read_status);
           }
           // Refresh messages to get updated read status
           if (onRefreshMessages) {
@@ -92,6 +88,8 @@ const MessageList: React.FC<MessageListProps> = ({
           }
         }
         break;
+
+
 
       default:
         // Handle other message types if needed
@@ -399,7 +397,7 @@ const MessageList: React.FC<MessageListProps> = ({
               <div
                 className={`inline-block px-4 py-2 rounded-lg max-w-[75%] shadow-sm hover:shadow-md transition-shadow duration-200 group ${
                   message.sender_id === user?.user_id
-                    ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-br-none'
+                    ? 'bg-gradient-to-r from-green-500 to-green-600 text-white rounded-br-none'
                     : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-bl-none'
                 }`}
               >

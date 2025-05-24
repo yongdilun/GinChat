@@ -1420,3 +1420,28 @@ go build -o ginchat-server
 - **Input Sanitization**: Add additional input sanitization for user-generated content
 - **Database Security**: Use strong database passwords and restrict network access
 - **Logging**: Implement comprehensive logging for security monitoring
+
+## Recent Updates & Improvements
+
+### WebSocket Enhancements (Latest)
+- **Thread-Safe WebSocket Connections**: Implemented `SafeWebSocketConn` wrapper to prevent concurrent write crashes
+- **Simplified Auto-Mark Logic**: Removed complex auto-marking during WebSocket broadcasts for better performance
+- **Enhanced Connection Management**: Added panic recovery and better error handling for WebSocket operations
+- **Dual Connection Architecture**: Separate WebSocket connections for chat rooms and sidebar updates
+- **Improved Logging**: Better connection type identification and debugging information
+
+### Read Status System Optimizations
+- **Visual Tick Indicators**: Simple grey/blue tick system based on existing read status data
+- **Real-time Updates**: Read status changes propagate instantly via WebSocket without additional API calls
+- **Performance Improvements**: Reduced database operations and API calls for better responsiveness
+- **Connection Stability**: Eliminated connection issues caused by excessive auto-marking requests
+
+### Security & Performance
+- **Cloudinary Integration**: Secure media storage with automatic cleanup on message/chatroom deletion
+- **JWT Security**: Robust token-based authentication with proper validation
+- **Database Optimization**: Efficient queries and connection pooling for better performance
+- **Error Handling**: Comprehensive error handling with proper HTTP status codes
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

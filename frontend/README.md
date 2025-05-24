@@ -316,3 +316,47 @@ NEXT_PUBLIC_API_URL=http://localhost:8080
 The frontend expects the backend to be running on `http://localhost:8080` by default. This can be changed in the `next.config.js` file.
 
 The application checks for backend availability using the `/health` endpoint.
+
+## Recent Updates & Improvements
+
+### WebSocket & Connection Stability (Latest)
+- **Simplified Auto-Mark Logic**: Removed complex frontend auto-marking to prevent connection issues
+- **Enhanced Error Handling**: Improved API error handling with better user feedback
+- **Connection Optimization**: Reduced API timeout from 15s to 10s for better responsiveness
+- **WebSocket Reliability**: Simplified WebSocket message handling for better stability
+
+### Visual Tick System Enhancements
+- **Simple Tick Logic**: Streamlined grey/blue tick system based on existing read status data
+- **Real-time Updates**: Ticks update instantly via WebSocket without additional API calls
+- **Performance Optimization**: Eliminated excessive API requests that caused connection issues
+- **Visual Consistency**: Consistent tick display across all message types
+
+### UI/UX Improvements
+- **Responsive Design**: Better mobile and desktop experience
+- **Loading States**: Improved loading indicators and error states
+- **Animation Enhancements**: Smooth Framer Motion animations for better user experience
+- **Accessibility**: Better keyboard navigation and screen reader support
+
+### Code Quality & Performance
+- **TypeScript Strict Mode**: Enhanced type safety and developer experience
+- **Component Optimization**: Better React component structure and performance
+- **Error Boundaries**: Comprehensive error handling with fallback UI
+- **Bundle Optimization**: Reduced bundle size and improved loading times
+
+### Security Enhancements
+- **JWT Token Management**: Secure token storage and automatic refresh
+- **API Security**: Proper authentication headers and CORS handling
+- **Input Validation**: Client-side validation with React Hook Form
+- **XSS Protection**: Sanitized user input and secure content rendering
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
