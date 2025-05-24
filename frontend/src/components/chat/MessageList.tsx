@@ -49,7 +49,6 @@ const MessageList: React.FC<MessageListProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
-  const processedAutoMarkRef = useRef<Set<string>>(new Set()); // Track auto-marked messages
   const [firstUnreadMessageId, setFirstUnreadMessageId] = useState<string | null>(null);
 
   // WebSocket for real-time updates
@@ -67,27 +66,7 @@ const MessageList: React.FC<MessageListProps> = ({
           if (onNewMessage && lastMessage.data) {
             const newMessage = lastMessage.data as Message;
             onNewMessage(newMessage);
-
-            // Auto-mark new message as read if it's not from the current user
-            if (newMessage.sender_id !== user.user_id && !processedAutoMarkRef.current.has(newMessage.id)) {
-              // Mark as processed to prevent duplicate calls
-              processedAutoMarkRef.current.add(newMessage.id);
-
-              // Add a delay and error handling to prevent connection issues
-              setTimeout(async () => {
-                try {
-                  // Only mark as read if the component is still mounted and user is still in the same chatroom
-                  if (selectedChatroom && selectedChatroom.id === lastMessage.chatroom_id) {
-                    await messageReadStatusAPI.markMessageAsRead(newMessage.id);
-                    console.log('Auto-marked new WebSocket message as read:', newMessage.id);
-                  }
-                } catch (error) {
-                  console.error('Failed to auto-mark new WebSocket message as read:', error);
-                  // Remove from processed set on error so it can be retried
-                  processedAutoMarkRef.current.delete(newMessage.id);
-                }
-              }, 1500); // Increased delay to 1.5 seconds
-            }
+            console.log('New message received via WebSocket (auto-marked by backend):', newMessage.id);
           }
           // Auto-scroll to bottom for new messages
           setTimeout(() => {
@@ -185,10 +164,9 @@ const MessageList: React.FC<MessageListProps> = ({
     return () => clearTimeout(timer);
   }, [selectedChatroom, user]);
 
-  // Reset first unread message and clear processed auto-mark when chatroom changes
+  // Reset first unread message when chatroom changes
   useEffect(() => {
     setFirstUnreadMessageId(null);
-    processedAutoMarkRef.current.clear(); // Clear processed auto-mark messages
   }, [selectedChatroom?.id]);
 
   // Extract filename from URL

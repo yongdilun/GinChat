@@ -627,3 +627,44 @@ func BroadcastUnreadCountUpdateGlobal(userID uint, unreadData any) {
 		GlobalWebSocketController.BroadcastUnreadCountUpdate(userID, unreadData)
 	}
 }
+
+// GetConnectedUsersInRoom returns a list of user IDs currently connected to a specific room
+func (wsc *WebSocketController) GetConnectedUsersInRoom(roomID string) []uint {
+	if wsc == nil {
+		return []uint{}
+	}
+
+	wsc.clientsMux.RLock()
+	defer wsc.clientsMux.RUnlock()
+
+	var connectedUsers []uint
+
+	// Check if the room exists
+	if clients, ok := wsc.rooms[roomID]; ok {
+		// Create a map to track unique user IDs (in case a user has multiple connections)
+		userMap := make(map[uint]bool)
+
+		// Find which users are connected to this room
+		for _, userConnections := range wsc.clients {
+			for conn := range userConnections {
+				// Check if this connection is in the specified room
+				if _, inRoom := clients[conn]; inRoom {
+					// Find the user ID for this connection
+					for userID, connections := range wsc.clients {
+						if _, hasConn := connections[conn]; hasConn {
+							userMap[userID] = true
+							break
+						}
+					}
+				}
+			}
+		}
+
+		// Convert map keys to slice
+		for userID := range userMap {
+			connectedUsers = append(connectedUsers, userID)
+		}
+	}
+
+	return connectedUsers
+}

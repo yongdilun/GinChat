@@ -116,6 +116,28 @@ func (mc *MessageController) SendMessage(c *gin.Context) {
 
 	// Check if GlobalWebSocketController is available
 	if GlobalWebSocketController != nil {
+		// Auto-mark message as read for users currently connected to this chatroom via WebSocket
+		if mc.MessageService.ReadStatusSvc != nil {
+			connectedUsers := GlobalWebSocketController.GetConnectedUsersInRoom(chatroomID.Hex())
+			for _, connectedUserID := range connectedUsers {
+				// Skip the sender (they don't mark their own message as read)
+				if connectedUserID != userID.(uint) {
+					err := mc.MessageService.ReadStatusSvc.MarkMessageAsRead(message.ID, connectedUserID)
+					if err == nil {
+						fmt.Printf("Auto-marked message %s as read for connected user %d\n", message.ID.Hex(), connectedUserID)
+					} else {
+						fmt.Printf("Failed to auto-mark message as read for user %d: %v\n", connectedUserID, err)
+					}
+				}
+			}
+
+			// Get updated read status after auto-marking
+			readStatus, err := mc.MessageService.ReadStatusSvc.GetMessageReadStatus(message.ID)
+			if err == nil {
+				messageResponse.ReadStatus = readStatus
+			}
+		}
+
 		GlobalWebSocketController.BroadcastNewMessage(chatroomID.Hex(), messageResponse)
 
 		// Also send unread count updates to all chatroom members for sidebar updates
