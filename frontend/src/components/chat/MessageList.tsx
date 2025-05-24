@@ -66,7 +66,6 @@ const MessageList: React.FC<MessageListProps> = ({
           if (onNewMessage && lastMessage.data) {
             const newMessage = lastMessage.data as Message;
             onNewMessage(newMessage);
-            console.log('New message received via WebSocket (auto-marked by backend):', newMessage.id);
           }
           // Auto-scroll to bottom for new messages
           setTimeout(() => {
@@ -511,68 +510,30 @@ const MessageList: React.FC<MessageListProps> = ({
                     <p className="text-xs opacity-70">
                       {new Date(message.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
-                    {/* Blue tick for read status - only show for sender's messages */}
+                    {/* Simple read status ticks - only show for sender's messages */}
                     {message.sender_id === user?.user_id && (
                       <div className="flex items-center ml-1">
-                        {(() => {
-                          // Debug logging
-                          console.log('Message:', message.id, 'Sender:', message.sender_id, 'User:', user?.user_id, 'Read Status:', message.read_status);
-
-                          // Always show ticks for sender's messages
-                          // Check if read status exists and all recipients have read the message
-                          if (message.read_status && message.read_status.length > 0) {
-                            const allRead = message.read_status.every(status => status.is_read);
-                            const someRead = message.read_status.some(status => status.is_read);
-
-                            if (allRead) {
-                              // All read - blue double tick
-                              return (
-                                <div className="flex items-center text-blue-500" title={`Read by all (${message.read_status.length} recipients)`}>
-                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                  </svg>
-                                  <svg className="w-4 h-4 -ml-1" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                  </svg>
-                                </div>
-                              );
-                            } else if (someRead) {
-                              // Some read - gray double tick
-                              const readCount = message.read_status.filter(status => status.is_read).length;
-                              return (
-                                <div className="flex items-center text-gray-400" title={`Read by ${readCount} of ${message.read_status.length} recipients`}>
-                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                  </svg>
-                                  <svg className="w-4 h-4 -ml-1" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                  </svg>
-                                </div>
-                              );
-                            } else {
-                              // None read - gray double tick (delivered to all but not read)
-                              return (
-                                <div className="flex items-center text-gray-400" title={`Delivered to ${message.read_status.length} recipients (not read yet)`}>
-                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                  </svg>
-                                  <svg className="w-4 h-4 -ml-1" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                  </svg>
-                                </div>
-                              );
-                            }
-                          } else {
-                            // No read status data - single gray tick (delivered)
-                            return (
-                              <div className="flex items-center text-gray-400" title="Delivered">
-                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                </svg>
-                              </div>
-                            );
-                          }
-                        })()}
+                        {message.read_status && message.read_status.length > 0 && message.read_status.every(status => status.is_read) ? (
+                          // All read - blue double tick
+                          <div className="flex items-center text-blue-500" title="Read">
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                            <svg className="w-4 h-4 -ml-1" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                        ) : (
+                          // Not read - gray double tick
+                          <div className="flex items-center text-gray-400" title="Delivered">
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                            <svg className="w-4 h-4 -ml-1" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
