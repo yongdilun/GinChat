@@ -44,28 +44,46 @@ const MessageList: React.FC<MessageListProps> = ({
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [firstUnreadMessageId, setFirstUnreadMessageId] = useState<string | null>(null);
 
-  // Get first unread message when chatroom changes (for label positioning only)
+  // Get first unread message and auto-scroll to it when chatroom changes
   useEffect(() => {
     if (!selectedChatroom || !user) return;
 
-    const getFirstUnread = async () => {
+    const getFirstUnreadAndScroll = async () => {
       try {
         const response = await messageReadStatusAPI.getFirstUnreadMessage(selectedChatroom.id);
         const firstUnreadMessage = response.data;
 
         if (firstUnreadMessage) {
           setFirstUnreadMessageId(firstUnreadMessage.id);
+
+          // Wait for messages to load, then scroll to first unread message
+          setTimeout(() => {
+            const messageElement = document.getElementById(`message-${firstUnreadMessage.id}`);
+            if (messageElement) {
+              messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }, 500);
         } else {
           setFirstUnreadMessageId(null);
+          // No unread messages, scroll to bottom
+          setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+          }, 300);
         }
       } catch (error) {
         console.error('Failed to get first unread message:', error);
         setFirstUnreadMessageId(null);
+        // Fallback to scrolling to bottom
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 300);
       }
     };
 
-    getFirstUnread();
-  }, [selectedChatroom, user]);
+    if (messages.length > 0) {
+      getFirstUnreadAndScroll();
+    }
+  }, [selectedChatroom, user, messages]);
 
   // Auto-mark all messages as read when entering chatroom
   useEffect(() => {

@@ -80,6 +80,13 @@ func (s *MessageReadStatusService) CreateReadStatusForMessage(messageID primitiv
 func (s *MessageReadStatusService) MarkMessageAsRead(messageID primitive.ObjectID, userID uint) error {
 	now := time.Now()
 
+	// Get the message to find the chatroom
+	var message models.Message
+	err := s.MessageColl.FindOne(context.Background(), bson.M{"_id": messageID}).Decode(&message)
+	if err != nil {
+		return errors.New("message not found")
+	}
+
 	// Update the read status
 	filter := bson.M{
 		"message_id":   messageID,
@@ -108,6 +115,8 @@ func (s *MessageReadStatusService) MarkMessageAsRead(messageID primitive.ObjectI
 		// Log error but don't fail the operation
 		// This is not critical for the read status update
 	}
+
+	// WebSocket notification will be handled in the controller to avoid circular dependencies
 
 	return nil
 }

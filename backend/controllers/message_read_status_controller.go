@@ -1,11 +1,14 @@
 package controllers
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ginchat/models"
 	"github.com/ginchat/services"
 	"github.com/ginchat/utils"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -70,6 +73,32 @@ func (c *MessageReadStatusController) MarkMessageAsRead(ctx *gin.Context) {
 		}
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": utils.FormatServiceError(err)})
 		return
+	}
+
+	// Send WebSocket notification about message read status update
+	readStatus, err := c.ReadStatusService.GetMessageReadStatus(messageObjectID)
+	if err == nil {
+		// Get the message to find the chatroom
+		var message models.Message
+		err := c.ReadStatusService.MessageColl.FindOne(context.Background(), bson.M{"_id": messageObjectID}).Decode(&message)
+		if err == nil {
+			// Broadcast read status update to the chatroom
+			BroadcastMessageReadGlobal(message.ChatroomID.Hex(), map[string]any{
+				"message_id":  messageObjectID.Hex(),
+				"read_status": readStatus,
+			})
+
+			// Get updated unread counts for all users in the chatroom
+			chatroom, err := c.ReadStatusService.ChatroomService.GetChatroomByID(message.ChatroomID)
+			if err == nil {
+				for _, member := range chatroom.Members {
+					unreadCounts, err := c.ReadStatusService.GetUnreadCountForUser(member.UserID)
+					if err == nil {
+						BroadcastUnreadCountUpdateGlobal(member.UserID, unreadCounts)
+					}
+				}
+			}
+		}
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{"message": "Message marked as read successfully"})

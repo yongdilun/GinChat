@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { User, Chatroom, LatestChatMessage, ChatroomUnreadCount } from '@/types';
 import { chatroomAPI, messageReadStatusAPI } from '@/services/api';
+import { useWebSocket } from '@/contexts/WebSocketContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { XIcon } from '@heroicons/react/outline';
 import ChatroomActions from './ChatroomActions';
@@ -71,6 +72,9 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
   const [latestMessages, setLatestMessages] = useState<LatestChatMessage[]>([]);
   const [unreadCounts, setUnreadCounts] = useState<ChatroomUnreadCount[]>([]);
 
+  // Use WebSocket context for real-time updates
+  const { lastMessage } = useWebSocket();
+
   // Filter chatrooms to show only joined ones
   useEffect(() => {
     if (!user) return;
@@ -116,6 +120,31 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
     }
   }, [refreshTrigger, fetchLatestMessagesAndCounts]);
 
+  // Handle WebSocket messages for real-time updates
+  useEffect(() => {
+    if (!lastMessage) return;
+
+    switch (lastMessage.type) {
+      case 'new_message':
+        // Refresh latest messages and unread counts when a new message arrives
+        fetchLatestMessagesAndCounts();
+        break;
+      case 'message_read':
+        // Refresh unread counts when messages are read
+        fetchLatestMessagesAndCounts();
+        break;
+      case 'unread_count_update':
+        // Update unread counts directly
+        if (lastMessage.data && Array.isArray(lastMessage.data)) {
+          setUnreadCounts(lastMessage.data);
+        }
+        break;
+      default:
+        // Handle other message types if needed
+        break;
+    }
+  }, [lastMessage, fetchLatestMessagesAndCounts]);
+
   // Helper function to get latest message for a chatroom
   const getLatestMessageForChatroom = (chatroomId: string) => {
     if (!latestMessages || !Array.isArray(latestMessages)) return null;
@@ -128,17 +157,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
       return 0;
     }
 
-    // Debug logging
-    console.log(`Looking for unread count for chatroom ID: ${chatroomId}`);
-    console.log('Available unread counts:', unreadCounts.map(count => ({
-      chatroom_id: count.chatroom_id,
-      chatroom_name: count.chatroom_name,
-      unread_count: count.unread_count
-    })));
-
     const unreadData = unreadCounts.find(count => count.chatroom_id === chatroomId);
-    console.log(`Found unread data for ${chatroomId}:`, unreadData);
-
     return unreadData?.unread_count || 0;
   };
 
@@ -355,43 +374,15 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
         </div>
 
         {!isSidebarCollapsed && (
-          <div className="mt-3 space-y-2">
-            {/* Debug panel */}
-            <div className="text-xs text-gray-500 p-2 bg-gray-100 rounded max-h-32 overflow-y-auto">
-              <p>Debug: Unread counts: {unreadCounts.length}</p>
-              <p>Latest messages: {latestMessages.length}</p>
-              <p>Chatrooms: {chatrooms.length}</p>
-              {unreadCounts.length > 0 && (
-                <div className="mt-1">
-                  <p className="font-semibold">Unread data:</p>
-                  {unreadCounts.map((count, index) => (
-                    <p key={index} className="text-xs">
-                      ID: &quot;{count.chatroom_id}&quot; | Name: &quot;{count.chatroom_name}&quot; | Count: {count.unread_count}
-                    </p>
-                  ))}
-                </div>
-              )}
-              {chatrooms.length > 0 && (
-                <div className="mt-1">
-                  <p className="font-semibold">Chatroom IDs:</p>
-                  {chatrooms.map((room, index) => (
-                    <p key={index} className="text-xs">
-                      &quot;{room.id}&quot; - {room.name}
-                    </p>
-                  ))}
-                </div>
-              )}
-            </div>
-            <motion.button
-              onClick={handleLogout}
-              className="w-full px-3 py-2 flex items-center justify-center text-sm text-white bg-red-500 rounded-md hover:bg-red-600 transition-colors"
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-            >
-              <LogoutIcon className="w-4 h-4 mr-2" />
-              Logout
-            </motion.button>
-          </div>
+          <motion.button
+            onClick={handleLogout}
+            className="mt-3 w-full px-3 py-2 flex items-center justify-center text-sm text-white bg-red-500 rounded-md hover:bg-red-600 transition-colors"
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+          >
+            <LogoutIcon className="w-4 h-4 mr-2" />
+            Logout
+          </motion.button>
         )}
 
         {isSidebarCollapsed && (

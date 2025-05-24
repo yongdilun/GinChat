@@ -10,6 +10,7 @@ import MessageInput from '@/components/chat/MessageInput';
 import { User, Chatroom, Message, WebSocketMessage } from '@/types';
 import { chatroomAPI, messageAPI } from '@/services/api';
 import useWebSocket from '@/hooks/useWebSocket';
+import { WebSocketProvider, useWebSocket as useWebSocketContext } from '@/contexts/WebSocketContext';
 
 // Interface for media inside chatrooms
 interface Media {
@@ -90,7 +91,7 @@ const WelcomePage = ({ user, onCreateChatroom, onJoinChatroom }: {
   );
 };
 
-export default function ChatPage() {
+function ChatPageContent() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [chatrooms, setChatrooms] = useState<Chatroom[]>([]);
@@ -562,5 +563,13 @@ export default function ChatPage() {
         </div>
       </div>
     </ChatLayout>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <WebSocketProvider>
+      <ChatPageContent />
+    </WebSocketProvider>
   );
 }

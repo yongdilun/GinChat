@@ -14,13 +14,13 @@ import (
 
 // WebSocketController handles WebSocket connections
 type WebSocketController struct {
-	clients              map[uint]map[*websocket.Conn]bool
-	rooms                map[string]map[*websocket.Conn]bool
-	clientsMux           sync.RWMutex
-	broadcast            chan []byte
-	logger               *logrus.Logger
-	processedMessages    map[string]map[string]bool
-	connectionAttempts   map[uint]time.Time
+	clients               map[uint]map[*websocket.Conn]bool
+	rooms                 map[string]map[*websocket.Conn]bool
+	clientsMux            sync.RWMutex
+	broadcast             chan []byte
+	logger                *logrus.Logger
+	processedMessages     map[string]map[string]bool
+	connectionAttempts    map[uint]time.Time
 	connectionAttemptsMux sync.RWMutex
 }
 
@@ -52,9 +52,9 @@ func NewWebSocketController(logger *logrus.Logger) *WebSocketController {
 
 // WebSocketMessage represents a message sent over WebSocket
 type WebSocketMessage struct {
-	Type       string      `json:"type"`
-	ChatroomID string      `json:"chatroom_id,omitempty"`
-	Data       interface{} `json:"data"`
+	Type       string `json:"type"`
+	ChatroomID string `json:"chatroom_id,omitempty"`
+	Data       any    `json:"data"`
 }
 
 // WebSocket connection upgrader
@@ -145,7 +145,7 @@ func (wsc *WebSocketController) HandleConnection(c *gin.Context) {
 	// Send connection success message
 	connectMsg := WebSocketMessage{
 		Type: "connected",
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"message": "Connected to WebSocket server",
 			"user_id": uid,
 			"room_id": roomID,
@@ -316,7 +316,7 @@ func (wsc *WebSocketController) handleBroadcasts() {
 }
 
 // BroadcastNewMessage broadcasts a new message to clients in a specific chatroom
-func (wsc *WebSocketController) BroadcastNewMessage(chatroomID string, message interface{}) {
+func (wsc *WebSocketController) BroadcastNewMessage(chatroomID string, message any) {
 	if wsc == nil {
 		return // Safety check
 	}
@@ -340,8 +340,75 @@ func (wsc *WebSocketController) BroadcastNewMessage(chatroomID string, message i
 }
 
 // BroadcastNewMessageGlobal is a helper function to broadcast a message using the global controller
-func BroadcastNewMessageGlobal(chatroomID string, message interface{}) {
+func BroadcastNewMessageGlobal(chatroomID string, message any) {
 	if GlobalWebSocketController != nil {
 		GlobalWebSocketController.BroadcastNewMessage(chatroomID, message)
+	}
+}
+
+// BroadcastMessageRead broadcasts message read status updates to clients in a specific chatroom
+func (wsc *WebSocketController) BroadcastMessageRead(chatroomID string, readData any) {
+	if wsc == nil {
+		return // Safety check
+	}
+
+	// Create WebSocket message
+	wsMessage := WebSocketMessage{
+		Type:       "message_read",
+		ChatroomID: chatroomID,
+		Data:       readData,
+	}
+
+	// Marshal to JSON
+	jsonMessage, err := json.Marshal(wsMessage)
+	if err != nil {
+		wsc.logger.Errorf("Failed to marshal WebSocket message: %v", err)
+		return
+	}
+
+	// Send to broadcast channel
+	wsc.broadcast <- jsonMessage
+}
+
+// BroadcastMessageReadGlobal is a helper function to broadcast message read status using the global controller
+func BroadcastMessageReadGlobal(chatroomID string, readData any) {
+	if GlobalWebSocketController != nil {
+		GlobalWebSocketController.BroadcastMessageRead(chatroomID, readData)
+	}
+}
+
+// BroadcastUnreadCountUpdate broadcasts unread count updates to a specific user
+func (wsc *WebSocketController) BroadcastUnreadCountUpdate(userID uint, unreadData any) {
+	if wsc == nil {
+		return // Safety check
+	}
+
+	// Create WebSocket message
+	wsMessage := WebSocketMessage{
+		Type: "unread_count_update",
+		Data: unreadData,
+	}
+
+	// Marshal to JSON
+	jsonMessage, err := json.Marshal(wsMessage)
+	if err != nil {
+		wsc.logger.Errorf("Failed to marshal WebSocket message: %v", err)
+		return
+	}
+
+	// Send directly to user's connections
+	wsc.clientsMux.RLock()
+	if connections, ok := wsc.clients[userID]; ok {
+		for conn := range connections {
+			conn.WriteMessage(websocket.TextMessage, jsonMessage)
+		}
+	}
+	wsc.clientsMux.RUnlock()
+}
+
+// BroadcastUnreadCountUpdateGlobal is a helper function to broadcast unread count updates using the global controller
+func BroadcastUnreadCountUpdateGlobal(userID uint, unreadData any) {
+	if GlobalWebSocketController != nil {
+		GlobalWebSocketController.BroadcastUnreadCountUpdate(userID, unreadData)
 	}
 }
