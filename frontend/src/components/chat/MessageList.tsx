@@ -78,15 +78,15 @@ const MessageList: React.FC<MessageListProps> = ({
         // Handle real-time read status updates
         if (lastMessage.chatroom_id === selectedChatroom.id) {
           console.log('Message read status update via WebSocket:', lastMessage.data);
-          if (onMessageReadStatusUpdate && lastMessage.data) {
+          if (lastMessage.data) {
             const data = lastMessage.data as { message_id?: string; read_status?: ReadInfo[] };
             if (data.message_id && data.read_status) {
-              onMessageReadStatusUpdate(data.message_id, data.read_status);
+              // Update the specific message's read status in real-time
+              if (onMessageReadStatusUpdate) {
+                onMessageReadStatusUpdate(data.message_id, data.read_status);
+              }
+              console.log(`Updated read status for message ${data.message_id} in real-time`);
             }
-          }
-          // Refresh messages to get updated read status
-          if (onRefreshMessages) {
-            onRefreshMessages();
           }
         }
         break;
@@ -139,7 +139,19 @@ const MessageList: React.FC<MessageListProps> = ({
     getFirstUnreadAndScroll();
   }, [selectedChatroom?.id, user?.user_id]); // Removed messages dependency
 
-  // Auto-mark all messages as read when entering chatroom
+  // Manual mark message as read when clicked (for testing real-time updates)
+  const handleMessageClick = async (messageId: string) => {
+    if (!user || !selectedChatroom) return;
+
+    try {
+      await messageReadStatusAPI.markMessageAsRead(messageId);
+      console.log('Manually marked message as read:', messageId);
+    } catch (error) {
+      console.error('Failed to mark message as read:', error);
+    }
+  };
+
+  // Auto-mark all messages as read when entering chatroom (disabled for testing)
   useEffect(() => {
     if (!selectedChatroom || !user) return;
 
@@ -155,10 +167,10 @@ const MessageList: React.FC<MessageListProps> = ({
       }
     };
 
-    // Mark as read after a short delay to ensure user has seen the messages
+    // Mark as read after a longer delay to allow testing of real-time updates
     const timer = setTimeout(() => {
       markAllAsRead();
-    }, 2000);
+    }, 10000); // Increased to 10 seconds for testing
 
     return () => clearTimeout(timer);
   }, [selectedChatroom, user, onRefreshMessages]);
@@ -397,11 +409,12 @@ const MessageList: React.FC<MessageListProps> = ({
                 }`}
               >
               <div
-                className={`inline-block px-4 py-2 rounded-lg max-w-[75%] shadow-sm hover:shadow-md transition-shadow duration-200 group ${
+                className={`inline-block px-4 py-2 rounded-lg max-w-[75%] shadow-sm hover:shadow-md transition-shadow duration-200 group cursor-pointer ${
                   message.sender_id === user?.user_id
                     ? 'bg-gradient-to-r from-green-500 to-green-600 text-white rounded-br-none'
                     : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-bl-none'
                 }`}
+                onClick={() => handleMessageClick(message.id)}
               >
                 <div className="flex items-center mb-1">
                   <div className={`w-5 h-5 rounded-full ${
