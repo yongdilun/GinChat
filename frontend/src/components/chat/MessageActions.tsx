@@ -89,7 +89,7 @@ const MessageActions: React.FC<MessageActionsProps> = ({
     setIsUploading(true);
     try {
       // Determine message type based on file type
-      let messageType = 'picture';
+      let messageType: 'picture' | 'audio' | 'video' = 'picture';
       if (file.type.startsWith('audio/')) {
         messageType = 'audio';
       } else if (file.type.startsWith('video/')) {
@@ -103,7 +103,11 @@ const MessageActions: React.FC<MessageActionsProps> = ({
 
       // Update message type based on content
       if (editContent.trim()) {
-        setEditMessageType(`text_and_${messageType}`);
+        // Use explicit type mapping for TypeScript
+        const combinedType = messageType === 'picture' ? 'text_and_picture' :
+                           messageType === 'audio' ? 'text_and_audio' :
+                           'text_and_video';
+        setEditMessageType(combinedType);
       } else {
         setEditMessageType(messageType);
       }
