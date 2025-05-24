@@ -92,9 +92,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
         messageReadStatusAPI.getUnreadCounts(),
       ]);
 
-      console.log('Latest messages response:', latestResponse.data);
-      console.log('Unread counts response:', unreadResponse.data);
-      console.log('Unread counts structure:', JSON.stringify(unreadResponse.data, null, 2));
+
 
       setLatestMessages(latestResponse.data || []);
       setUnreadCounts(unreadResponse.data || []);
@@ -127,16 +125,21 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
   // Helper function to get unread count for a chatroom
   const getUnreadCountForChatroom = (chatroomId: string) => {
     if (!unreadCounts || !Array.isArray(unreadCounts)) {
-      console.log('No unread counts available:', unreadCounts);
       return 0;
     }
-    console.log(`Looking for unread count for chatroom ${chatroomId}`);
-    console.log('Available unread counts:', unreadCounts);
+
+    // Debug logging
+    console.log(`Looking for unread count for chatroom ID: "${chatroomId}"`);
+    console.log('Available unread counts:', unreadCounts.map(count => ({
+      chatroom_id: count.chatroom_id,
+      chatroom_name: count.chatroom_name,
+      unread_count: count.unread_count
+    })));
+
     const unreadData = unreadCounts.find(count => count.chatroom_id === chatroomId);
-    console.log(`Found unread data:`, unreadData);
-    const count = unreadData?.unread_count || 0;
-    console.log(`Final unread count for chatroom ${chatroomId}:`, count);
-    return count;
+    console.log(`Found unread data for "${chatroomId}":`, unreadData);
+
+    return unreadData?.unread_count || 0;
   };
 
   // Helper function to format latest message text
@@ -353,23 +356,27 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
 
         {!isSidebarCollapsed && (
           <div className="mt-3 space-y-2">
-            <motion.button
-              onClick={fetchLatestMessagesAndCounts}
-              className="w-full px-3 py-2 flex items-center justify-center text-sm text-white bg-blue-500 rounded-md hover:bg-blue-600 transition-colors"
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-            >
-              🔄 Refresh Counts
-            </motion.button>
+            {/* Debug panel */}
             <div className="text-xs text-gray-500 p-2 bg-gray-100 rounded max-h-32 overflow-y-auto">
               <p>Debug: Unread counts: {unreadCounts.length}</p>
               <p>Latest messages: {latestMessages.length}</p>
+              <p>Chatrooms: {chatrooms.length}</p>
               {unreadCounts.length > 0 && (
                 <div className="mt-1">
                   <p className="font-semibold">Unread data:</p>
                   {unreadCounts.map((count, index) => (
                     <p key={index} className="text-xs">
-                      {count.chatroom_name}: {count.unread_count} unread
+                      ID: "{count.chatroom_id}" | Name: "{count.chatroom_name}" | Count: {count.unread_count}
+                    </p>
+                  ))}
+                </div>
+              )}
+              {chatrooms.length > 0 && (
+                <div className="mt-1">
+                  <p className="font-semibold">Chatroom IDs:</p>
+                  {chatrooms.map((room, index) => (
+                    <p key={index} className="text-xs">
+                      "{room.id}" - {room.name}
                     </p>
                   ))}
                 </div>
@@ -717,7 +724,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                           <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold">
                             {chatroom.name.charAt(0).toUpperCase()}
                           </div>
-                          {isSidebarCollapsed && (
+                          {isSidebarCollapsed && getUnreadCountForChatroom(chatroom.id) > 0 && (
                             <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold shadow-lg animate-pulse border-2 border-white">
                               {getUnreadCountForChatroom(chatroom.id) > 99 ? '99+' : getUnreadCountForChatroom(chatroom.id)}
                             </div>
@@ -736,10 +743,11 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                                   </svg>
                                 )}
                               </div>
-                              {/* Always show badge for debugging */}
-                              <div className="bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-[24px] h-6 flex items-center justify-center font-bold shadow-lg animate-pulse">
-                                {getUnreadCountForChatroom(chatroom.id) > 99 ? '99+' : getUnreadCountForChatroom(chatroom.id)}
-                              </div>
+                              {getUnreadCountForChatroom(chatroom.id) > 0 && (
+                                <div className="bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-[24px] h-6 flex items-center justify-center font-bold shadow-lg animate-pulse">
+                                  {getUnreadCountForChatroom(chatroom.id) > 99 ? '99+' : getUnreadCountForChatroom(chatroom.id)}
+                                </div>
+                              )}
                             </div>
                             <div className="mt-1">
                               <p className="text-xs text-gray-500 dark:text-gray-400 truncate">

@@ -42,50 +42,30 @@ const MessageList: React.FC<MessageListProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
-  const [hasNavigatedToUnread, setHasNavigatedToUnread] = useState(false);
   const [firstUnreadMessageId, setFirstUnreadMessageId] = useState<string | null>(null);
 
-  // Auto-navigate to first unread message when entering chatroom
+  // Get first unread message when chatroom changes (for label positioning only)
   useEffect(() => {
-    if (!selectedChatroom || !user || hasNavigatedToUnread) return;
+    if (!selectedChatroom || !user) return;
 
-    const navigateToFirstUnread = async () => {
+    const getFirstUnread = async () => {
       try {
         const response = await messageReadStatusAPI.getFirstUnreadMessage(selectedChatroom.id);
         const firstUnreadMessage = response.data;
 
         if (firstUnreadMessage) {
           setFirstUnreadMessageId(firstUnreadMessage.id);
-
-          // Wait for DOM to update, then scroll to first unread message
-          setTimeout(() => {
-            const messageElement = document.getElementById(`message-${firstUnreadMessage.id}`);
-            if (messageElement) {
-              messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-          }, 300);
         } else {
-          // No unread messages, scroll to bottom
-          setTimeout(() => {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-          }, 100);
+          setFirstUnreadMessageId(null);
         }
-
-        setHasNavigatedToUnread(true);
       } catch (error) {
         console.error('Failed to get first unread message:', error);
-        // Fallback to scrolling to bottom
-        setTimeout(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }, 100);
-        setHasNavigatedToUnread(true);
+        setFirstUnreadMessageId(null);
       }
     };
 
-    if (messages.length > 0) {
-      navigateToFirstUnread();
-    }
-  }, [selectedChatroom, user, messages, hasNavigatedToUnread]);
+    getFirstUnread();
+  }, [selectedChatroom, user]);
 
   // Auto-mark all messages as read when entering chatroom
   useEffect(() => {
@@ -107,9 +87,8 @@ const MessageList: React.FC<MessageListProps> = ({
     return () => clearTimeout(timer);
   }, [selectedChatroom, user]);
 
-  // Reset navigation state when chatroom changes
+  // Reset first unread message when chatroom changes
   useEffect(() => {
-    setHasNavigatedToUnread(false);
     setFirstUnreadMessageId(null);
   }, [selectedChatroom?.id]);
 
@@ -451,9 +430,45 @@ const MessageList: React.FC<MessageListProps> = ({
                       </span>
                     )}
                   </div>
-                  <p className="text-xs opacity-70">
-                    {new Date(message.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </p>
+                  <div className="flex items-center space-x-1">
+                    <p className="text-xs opacity-70">
+                      {new Date(message.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                    {/* Blue tick for read status - only show for sender's messages */}
+                    {message.sender_id === user?.user_id && message.read_status && (
+                      <div className="flex items-center">
+                        {/* Check if all recipients have read the message */}
+                        {message.read_status.every(status => status.is_read) ? (
+                          // All read - blue double tick
+                          <div className="flex items-center text-blue-500" title="Read by all">
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                            <svg className="w-3 h-3 -ml-1" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                        ) : message.read_status.some(status => status.is_read) ? (
+                          // Some read - gray double tick
+                          <div className="flex items-center text-gray-400" title="Read by some">
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                            <svg className="w-3 h-3 -ml-1" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                        ) : (
+                          // None read - single gray tick
+                          <div className="flex items-center text-gray-400" title="Delivered">
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 

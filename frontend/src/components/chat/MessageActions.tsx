@@ -71,7 +71,7 @@ const MessageActions: React.FC<MessageActionsProps> = ({
   const [editMessageType, setEditMessageType] = useState(message.message_type || 'text');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showReadStatus, setShowReadStatus] = useState(false);
-  const [readStatusData, setReadStatusData] = useState<MessageReadStatus[]>([]);
+  const [readStatusData, setReadStatusData] = useState<ReadInfo[]>([]);
   const [isLoadingReadStatus, setIsLoadingReadStatus] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -169,7 +169,8 @@ const MessageActions: React.FC<MessageActionsProps> = ({
     setShowReadStatus(true);
 
     try {
-      const response = await messageReadStatusAPI.getMessageReadByWho(message.id);
+      // Use the read-status endpoint which includes usernames
+      const response = await messageReadStatusAPI.getMessageReadStatus(message.id);
       setReadStatusData(response.data);
     } catch (error) {
       console.error('Failed to fetch read status:', error);
@@ -450,17 +451,16 @@ const MessageActions: React.FC<MessageActionsProps> = ({
                   {readStatusData.length > 0 ? (
                     readStatusData.map((status) => (
                       <div
-                        key={status.recipient_id}
+                        key={status.user_id}
                         className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
                       >
                         <div className="flex items-center">
                           <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-sm mr-3">
-                            {/* We'll need to get username from the status data */}
-                            U
+                            {status.username.charAt(0).toUpperCase()}
                           </div>
                           <div>
                             <p className="font-medium text-gray-900 dark:text-gray-100">
-                              User {status.recipient_id}
+                              {status.username}
                             </p>
                             {status.is_read && status.read_at && (
                               <p className="text-xs text-gray-500 dark:text-gray-400">
