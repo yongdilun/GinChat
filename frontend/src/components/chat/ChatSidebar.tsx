@@ -73,7 +73,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
   const [unreadCounts, setUnreadCounts] = useState<ChatroomUnreadCount[]>([]);
 
   // Use WebSocket context for real-time updates
-  const { lastMessage } = useWebSocket();
+  const { lastMessage, isConnected, connectionStatus } = useWebSocket();
 
   // Filter chatrooms to show only joined ones
   useEffect(() => {
@@ -374,15 +374,29 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
         </div>
 
         {!isSidebarCollapsed && (
-          <motion.button
-            onClick={handleLogout}
-            className="mt-3 w-full px-3 py-2 flex items-center justify-center text-sm text-white bg-red-500 rounded-md hover:bg-red-600 transition-colors"
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
-          >
-            <LogoutIcon className="w-4 h-4 mr-2" />
-            Logout
-          </motion.button>
+          <div className="mt-3 space-y-2">
+            {/* WebSocket Status Indicator */}
+            <div className="flex items-center justify-center text-xs text-gray-500">
+              <div className={`w-2 h-2 rounded-full mr-2 ${
+                isConnected ? 'bg-green-500' : 'bg-red-500'
+              }`}></div>
+              <span>
+                {connectionStatus === 'connected' ? 'Live Updates' :
+                 connectionStatus === 'connecting' ? 'Connecting...' :
+                 connectionStatus === 'error' ? 'Connection Error' : 'Offline'}
+              </span>
+            </div>
+
+            <motion.button
+              onClick={handleLogout}
+              className="w-full px-3 py-2 flex items-center justify-center text-sm text-white bg-red-500 rounded-md hover:bg-red-600 transition-colors"
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+            >
+              <LogoutIcon className="w-4 h-4 mr-2" />
+              Logout
+            </motion.button>
+          </div>
         )}
 
         {isSidebarCollapsed && (

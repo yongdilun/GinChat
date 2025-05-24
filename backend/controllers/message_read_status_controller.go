@@ -377,6 +377,18 @@ func (c *MessageReadStatusController) MarkAllMessagesInChatroomAsRead(ctx *gin.C
 		return
 	}
 
+	// Send WebSocket notification about unread count updates
+	chatroom, err := c.ReadStatusService.ChatroomService.GetChatroomByID(chatroomID)
+	if err == nil {
+		// Get updated unread counts for all users in the chatroom
+		for _, member := range chatroom.Members {
+			unreadCounts, err := c.ReadStatusService.GetUnreadCountForUser(member.UserID)
+			if err == nil {
+				BroadcastUnreadCountUpdateGlobal(member.UserID, unreadCounts)
+			}
+		}
+	}
+
 	ctx.JSON(http.StatusOK, gin.H{"message": "All messages marked as read successfully"})
 }
 

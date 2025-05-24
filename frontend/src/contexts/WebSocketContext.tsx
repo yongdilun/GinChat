@@ -75,11 +75,15 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     console.log('Connecting to WebSocket...');
 
     // Create WebSocket connection with user_id as query parameter
-    const wsUrl = `ws://localhost:8080/ws?user_id=${user.user_id}`;
+    // Use the same base URL as the API but with ws protocol
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+    const wsUrl = apiUrl.replace('http://', 'ws://').replace('https://', 'wss://') + `/ws?user_id=${user.user_id}`;
+
+    console.log('Attempting WebSocket connection to:', wsUrl);
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
-      console.log('WebSocket connected');
+      console.log('WebSocket connected successfully to:', wsUrl);
       setIsConnected(true);
       setConnectionStatus('connected');
       reconnectAttempts.current = 0;
