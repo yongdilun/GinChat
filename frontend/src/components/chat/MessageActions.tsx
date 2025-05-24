@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Image from 'next/image';
 import { Message, User } from '@/types';
 import { messageAPI } from '@/services/api';
 
@@ -53,12 +54,6 @@ const RemoveIcon = ({ className }: { className?: string }) => (
 const DotsIcon = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-  </svg>
-);
-
-const ChevronDownIcon = ({ className }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
   </svg>
 );
 
@@ -216,9 +211,11 @@ const MessageActions: React.FC<MessageActionsProps> = ({
               {/* Current Media Preview */}
               <div className="relative inline-block">
                 {editMessageType.includes('picture') && (
-                  <img
+                  <Image
                     src={editMediaUrl}
                     alt="Current media"
+                    width={128}
+                    height={128}
                     className="max-w-32 max-h-32 rounded-md object-cover"
                   />
                 )}
