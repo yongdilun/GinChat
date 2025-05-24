@@ -114,28 +114,53 @@ func (s *CloudinaryService) DeleteFile(mediaURL string) error {
 		return nil // No media to delete
 	}
 
-	// Extract public ID from Cloudinary URL
-	publicID, err := s.extractPublicIDFromURL(mediaURL)
+	// Extract public ID and resource type from Cloudinary URL
+	publicID, resourceType, err := s.extractPublicIDAndResourceType(mediaURL)
 	if err != nil {
-		// Log the error but don't fail the operation
+		// Try fallback method
+		return s.deleteFileWithFallback(mediaURL)
+	}
+
+	// Try to delete with the detected resource type first
+	invalidate := true
+	_, err = s.Cld.Upload.Destroy(context.Background(), uploader.DestroyParams{
+		PublicID:     publicID,
+		ResourceType: resourceType,
+		Invalidate:   &invalidate,
+	})
+
+	if err == nil {
+		// Successfully deleted
 		return nil
 	}
 
-	// Try deleting with different resource types since we can't always determine the exact type
-	resourceTypes := []string{"image", "video", "raw"}
+	// If that failed, try fallback method
+	return s.deleteFileWithFallback(mediaURL)
+}
+
+// deleteFileWithFallback tries to delete with all possible resource types
+func (s *CloudinaryService) deleteFileWithFallback(mediaURL string) error {
+	publicID, err := s.extractPublicIDFromURL(mediaURL)
+	if err != nil {
+		return nil // Don't fail the operation
+	}
+
+	// Try all possible resource types
+	resourceTypes := []string{"image", "video", "raw", "auto"}
+	invalidate := true
 
 	for _, resourceType := range resourceTypes {
 		_, err = s.Cld.Upload.Destroy(context.Background(), uploader.DestroyParams{
 			PublicID:     publicID,
 			ResourceType: resourceType,
+			Invalidate:   &invalidate,
 		})
 		if err == nil {
-			// Successfully deleted
-			return nil
+			return nil // Successfully deleted
 		}
 	}
 
-	// If all attempts failed, log but don't fail the operation
+	// If all attempts failed, don't fail the operation
 	return nil
 }
 
@@ -184,6 +209,87 @@ func (s *CloudinaryService) extractPublicIDFromURL(mediaURL string) (string, err
 	}
 
 	return "", errors.New("could not extract public ID")
+}
+
+// extractPublicIDAndResourceType extracts both public ID and resource type from Cloudinary URL
+func (s *CloudinaryService) extractPublicIDAndResourceType(mediaURL string) (string, string, error) {
+	if mediaURL == "" {
+		return "", "", errors.New("empty media URL")
+	}
+
+	// Parse the URL
+	parsedURL, err := url.Parse(mediaURL)
+	if err != nil {
+		return "", "", errors.New("invalid media URL")
+	}
+
+	// Extract path and remove leading slash
+	path := strings.TrimPrefix(parsedURL.Path, "/")
+
+	// Split path by '/'
+	parts := strings.Split(path, "/")
+	if len(parts) < 4 {
+		return "", "", errors.New("invalid Cloudinary URL format")
+	}
+
+	// For Cloudinary URLs, the format is:
+	// /{cloud_name}/{resource_type}/{type}/{version?}/{folder?}/{public_id}.{format}
+	// Examples:
+	// /demo/image/upload/v1234567890/sample.jpg
+	// /demo/video/upload/v1234567890/sample.mp4
+	// /demo/image/upload/folder/sample.jpg
+	// /demo/video/upload/folder/subfolder/sample.mp4
+
+	// parts[0] is cloud_name
+	resourceType := parts[1]
+	// parts[2] is upload_type (usually "upload")
+
+	// Find where the actual public ID starts
+	// Skip cloud_name, resource_type, upload_type
+	publicIDParts := parts[3:]
+
+	if len(publicIDParts) == 0 {
+		return "", "", errors.New("no public ID found in URL")
+	}
+
+	// Check if first part is a version (starts with 'v' followed by numbers)
+	startIndex := 0
+	if len(publicIDParts[0]) > 1 && publicIDParts[0][0] == 'v' {
+		// Check if the rest are digits
+		isVersion := true
+		for _, char := range publicIDParts[0][1:] {
+			if char < '0' || char > '9' {
+				isVersion = false
+				break
+			}
+		}
+		if isVersion {
+			startIndex = 1 // Skip version
+		}
+	}
+
+	// Get the actual public ID parts (everything after version)
+	actualPublicIDParts := publicIDParts[startIndex:]
+	if len(actualPublicIDParts) == 0 {
+		return "", "", errors.New("no public ID found after version")
+	}
+
+	// Remove file extension from the last part
+	lastPart := actualPublicIDParts[len(actualPublicIDParts)-1]
+	if dotIndex := strings.LastIndex(lastPart, "."); dotIndex != -1 {
+		lastPart = lastPart[:dotIndex]
+	}
+	actualPublicIDParts[len(actualPublicIDParts)-1] = lastPart
+
+	// Join all parts to form the public ID
+	publicID := strings.Join(actualPublicIDParts, "/")
+
+	return publicID, resourceType, nil
+}
+
+// TestURLParsing is a helper function to test URL parsing (for debugging)
+func (s *CloudinaryService) TestURLParsing(mediaURL string) (string, string, error) {
+	return s.extractPublicIDAndResourceType(mediaURL)
 }
 
 // getResourceType returns the Cloudinary resource type for a specific media type
