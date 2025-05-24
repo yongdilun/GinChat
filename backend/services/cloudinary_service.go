@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"mime/multipart"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -105,6 +106,75 @@ func (s *CloudinaryService) UploadFile(file *multipart.FileHeader, mediaType uti
 	}
 
 	return uploadResult.SecureURL, nil
+}
+
+// DeleteFile deletes a file from Cloudinary using its URL
+func (s *CloudinaryService) DeleteFile(mediaURL string) error {
+	if mediaURL == "" {
+		return nil // No media to delete
+	}
+
+	// Extract public ID from Cloudinary URL
+	publicID, err := s.extractPublicIDFromURL(mediaURL)
+	if err != nil {
+		return err
+	}
+
+	// Delete from Cloudinary
+	_, err = s.Cld.Upload.Destroy(context.Background(), uploader.DestroyParams{
+		PublicID: publicID,
+	})
+	if err != nil {
+		return errors.New("failed to delete media from Cloudinary")
+	}
+
+	return nil
+}
+
+// extractPublicIDFromURL extracts the public ID from a Cloudinary URL
+func (s *CloudinaryService) extractPublicIDFromURL(mediaURL string) (string, error) {
+	if mediaURL == "" {
+		return "", errors.New("empty media URL")
+	}
+
+	// Parse the URL
+	parsedURL, err := url.Parse(mediaURL)
+	if err != nil {
+		return "", errors.New("invalid media URL")
+	}
+
+	// Extract path and remove leading slash
+	path := strings.TrimPrefix(parsedURL.Path, "/")
+
+	// Split path by '/'
+	parts := strings.Split(path, "/")
+	if len(parts) < 3 {
+		return "", errors.New("invalid Cloudinary URL format")
+	}
+
+	// For Cloudinary URLs, the format is typically:
+	// /{cloud_name}/{resource_type}/{type}/{version}/{public_id}.{format}
+	// or /{cloud_name}/{resource_type}/{type}/{public_id}.{format}
+
+	// Find the public ID (last part without extension)
+	lastPart := parts[len(parts)-1]
+
+	// Remove file extension
+	if dotIndex := strings.LastIndex(lastPart, "."); dotIndex != -1 {
+		lastPart = lastPart[:dotIndex]
+	}
+
+	// Reconstruct public ID with folder structure
+	// Skip cloud_name, resource_type, and type (first 3 parts)
+	if len(parts) > 4 {
+		// Has version or folder structure
+		publicIDParts := parts[3:]
+		publicIDParts[len(publicIDParts)-1] = lastPart
+		return strings.Join(publicIDParts, "/"), nil
+	} else {
+		// Simple public ID
+		return lastPart, nil
+	}
 }
 
 // getResourceType returns the Cloudinary resource type for a specific media type

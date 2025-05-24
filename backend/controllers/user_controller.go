@@ -68,7 +68,8 @@ func (uc *UserController) Register(c *gin.Context) {
 	// Register user using the user service
 	user, err := uc.UserService.Register(req.Username, req.Email, req.Password, "member")
 	if err != nil {
-		if err.Error() == "user with this email or username already exists" {
+		errMsg := err.Error()
+		if errMsg == "user with this email already exists" || errMsg == "user with this username already exists" {
 			c.JSON(http.StatusConflict, gin.H{"error": utils.FormatServiceError(err)})
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": utils.FormatServiceError(err)})

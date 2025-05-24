@@ -14,13 +14,17 @@ import (
 // ChatroomController handles chatroom-related requests
 type ChatroomController struct {
 	ChatroomService *services.ChatroomService
+	MessageService  *services.MessageService
 }
 
 // NewChatroomController creates a new ChatroomController
 func NewChatroomController(db *gorm.DB, mongodb *mongo.Database) *ChatroomController {
 	chatroomService := services.NewChatroomService(mongodb)
+	cloudinaryService, _ := services.NewCloudinaryService() // Ignore error for now, will be nil if not configured
+	messageService := services.NewMessageService(mongodb, chatroomService, cloudinaryService)
 	return &ChatroomController{
 		ChatroomService: chatroomService,
+		MessageService:  messageService,
 	}
 }
 
@@ -250,4 +254,50 @@ func (cc *ChatroomController) JoinChatroom(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Joined chatroom successfully"})
+}
+
+// DeleteChatroom handles deleting a chatroom
+// @Summary Delete a chatroom
+// @Description Delete a chatroom and all its messages (only creator can delete)
+// @Tags chatrooms
+// @Produce json
+// @Param id path string true "Chatroom ID"
+// @Success 200 {object} map[string]string "Chatroom deleted successfully"
+// @Failure 400 {object} map[string]string "Bad request"
+// @Failure 401 {object} map[string]string "Unauthorized"
+// @Failure 403 {object} map[string]string "Forbidden"
+// @Failure 404 {object} map[string]string "Chatroom not found"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Security BearerAuth
+// @Router /api/chatrooms/{id} [delete]
+func (cc *ChatroomController) DeleteChatroom(c *gin.Context) {
+	// Get chatroom ID from URL
+	chatroomID, err := primitive.ObjectIDFromHex(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Please provide a valid chatroom ID"})
+		return
+	}
+
+	// Get user ID from context (set by auth middleware)
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Please log in to continue"})
+		return
+	}
+
+	// Delete chatroom using the service
+	err = cc.ChatroomService.DeleteChatroom(chatroomID, userID.(uint), cc.MessageService)
+	if err != nil {
+		switch err.Error() {
+		case "chatroom not found":
+			c.JSON(http.StatusNotFound, gin.H{"error": utils.FormatServiceError(err)})
+		case "only the creator can delete this chatroom":
+			c.JSON(http.StatusForbidden, gin.H{"error": "You can only delete chatrooms that you created"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": utils.FormatServiceError(err)})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Chatroom deleted successfully"})
 }

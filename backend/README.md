@@ -222,6 +222,25 @@ All endpoints below require `Authorization: Bearer <token>` header.
   }
   ```
 
+#### Delete Chatroom
+- **DELETE** `/api/chatrooms/:id`
+- **Description**: Delete a chatroom and all its messages (only creator can delete)
+- **Headers**: `Authorization: Bearer <token>`
+- **Parameters**: `id` (string) - Chatroom ObjectID
+- **Response**: `200 OK`
+  ```json
+  {
+    "message": "Chatroom deleted successfully"
+  }
+  ```
+- **Error Responses**:
+  - `403 Forbidden`: Only the chatroom creator can delete the chatroom
+  - `404 Not Found`: Chatroom not found
+- **Note**: This operation will permanently delete:
+  - The chatroom itself
+  - All messages in the chatroom
+  - All media files associated with messages in Cloudinary
+
 ### Messages (Auth Required)
 
 #### Get Messages
@@ -277,6 +296,62 @@ All endpoints below require `Authorization: Bearer <token>` header.
     }
   }
   ```
+
+#### Update Message
+- **PUT** `/api/chatrooms/:id/messages/:messageId`
+- **Description**: Update an existing message content and/or media (only sender can update)
+- **Headers**: `Authorization: Bearer <token>`
+- **Parameters**:
+  - `id` (string) - Chatroom ObjectID
+  - `messageId` (string) - Message ObjectID
+- **Request Body**:
+  ```json
+  {
+    "text_content": "string (optional) - Updated text content",
+    "media_url": "string (optional) - New media URL or empty string to remove media"
+  }
+  ```
+- **Response**: `200 OK`
+  ```json
+  {
+    "message": {
+      "id": "60d5f8b8e6b5f0b3e8b4b5b4",
+      "chatroom_id": "60d5f8b8e6b5f0b3e8b4b5b3",
+      "sender_id": 1,
+      "sender_name": "john_doe",
+      "message_type": "text",
+      "text_content": "Updated message content",
+      "media_url": "",
+      "sent_at": "2024-01-01T00:00:00Z",
+      "edited": true,
+      "edited_at": "2024-01-01T00:05:00Z"
+    }
+  }
+  ```
+- **Error Responses**:
+  - `403 Forbidden`: You can only update your own messages
+  - `404 Not Found`: Message not found
+- **Note**: When updating media, the old media file is automatically deleted from Cloudinary
+
+#### Delete Message
+- **DELETE** `/api/chatrooms/:id/messages/:messageId`
+- **Description**: Delete a message and its associated media (only sender can delete)
+- **Headers**: `Authorization: Bearer <token>`
+- **Parameters**:
+  - `id` (string) - Chatroom ObjectID
+  - `messageId` (string) - Message ObjectID
+- **Response**: `200 OK`
+  ```json
+  {
+    "message": "Message deleted successfully"
+  }
+  ```
+- **Error Responses**:
+  - `403 Forbidden`: You can only delete your own messages
+  - `404 Not Found`: Message not found
+- **Note**: This operation will permanently delete:
+  - The message from the database
+  - Any associated media file from Cloudinary
 
 ### Media (Auth Required)
 
@@ -351,6 +426,312 @@ All endpoints below require `Authorization: Bearer <token>` header.
 - **GET** `/swagger/*any`
 - **Description**: Interactive API documentation
 - **URL**: `http://localhost:8080/swagger/index.html`
+
+## API Usage Examples
+
+### Complete Workflow Examples
+
+#### 1. User Registration and Authentication
+
+```bash
+# Register a new user
+curl -X POST http://localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "john_doe",
+    "email": "john@example.com",
+    "password": "SecurePass123!"
+  }'
+
+# Response: Save the token for subsequent requests
+# {
+#   "user": {...},
+#   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+# }
+
+# Login (if already registered)
+curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "john@example.com",
+    "password": "SecurePass123!"
+  }'
+```
+
+#### 2. Chatroom Management
+
+```bash
+# Set your token as environment variable for convenience
+export TOKEN="your_jwt_token_here"
+
+# Create a new chatroom
+curl -X POST http://localhost:8080/api/chatrooms \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Project Discussion"
+  }'
+
+# Get all available chatrooms
+curl -X GET http://localhost:8080/api/chatrooms \
+  -H "Authorization: Bearer $TOKEN"
+
+# Get user's joined chatrooms
+curl -X GET http://localhost:8080/api/chatrooms/user \
+  -H "Authorization: Bearer $TOKEN"
+
+# Join an existing chatroom
+curl -X POST http://localhost:8080/api/chatrooms/60d5f8b8e6b5f0b3e8b4b5b3/join \
+  -H "Authorization: Bearer $TOKEN"
+
+# Get specific chatroom details
+curl -X GET http://localhost:8080/api/chatrooms/60d5f8b8e6b5f0b3e8b4b5b3 \
+  -H "Authorization: Bearer $TOKEN"
+
+# Delete a chatroom (creator only)
+curl -X DELETE http://localhost:8080/api/chatrooms/60d5f8b8e6b5f0b3e8b4b5b3 \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+#### 3. Message Operations
+
+```bash
+# Send a text message
+curl -X POST http://localhost:8080/api/chatrooms/60d5f8b8e6b5f0b3e8b4b5b3/messages \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message_type": "text",
+    "text_content": "Hello everyone! How is the project going?"
+  }'
+
+# Get messages from a chatroom
+curl -X GET "http://localhost:8080/api/chatrooms/60d5f8b8e6b5f0b3e8b4b5b3/messages?limit=20" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Update a message
+curl -X PUT http://localhost:8080/api/chatrooms/60d5f8b8e6b5f0b3e8b4b5b3/messages/60d5f8b8e6b5f0b3e8b4b5b4 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text_content": "Hello everyone! How is the project going? (Updated)"
+  }'
+
+# Delete a message
+curl -X DELETE http://localhost:8080/api/chatrooms/60d5f8b8e6b5f0b3e8b4b5b3/messages/60d5f8b8e6b5f0b3e8b4b5b4 \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+#### 4. Media Upload and Messaging
+
+```bash
+# Upload an image
+curl -X POST http://localhost:8080/api/media/upload \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@/path/to/your/image.jpg" \
+  -F "message_type=picture"
+
+# Response will include media_url:
+# {
+#   "media_url": "https://res.cloudinary.com/your-cloud/image/upload/v123456789/abc123.jpg",
+#   "file_name": "abc123.jpg",
+#   "message_type": "picture"
+# }
+
+# Send a picture message using the uploaded media URL
+curl -X POST http://localhost:8080/api/chatrooms/60d5f8b8e6b5f0b3e8b4b5b3/messages \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message_type": "picture",
+    "media_url": "https://res.cloudinary.com/your-cloud/image/upload/v123456789/abc123.jpg"
+  }'
+
+# Send a combined text and picture message
+curl -X POST http://localhost:8080/api/chatrooms/60d5f8b8e6b5f0b3e8b4b5b3/messages \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message_type": "text_and_picture",
+    "text_content": "Check out this amazing screenshot!",
+    "media_url": "https://res.cloudinary.com/your-cloud/image/upload/v123456789/abc123.jpg"
+  }'
+
+# Update message with new media
+curl -X PUT http://localhost:8080/api/chatrooms/60d5f8b8e6b5f0b3e8b4b5b3/messages/60d5f8b8e6b5f0b3e8b4b5b4 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text_content": "Updated caption for the image",
+    "media_url": "https://res.cloudinary.com/your-cloud/image/upload/v123456789/new_image.jpg"
+  }'
+```
+
+#### 5. WebSocket Connection
+
+```javascript
+// JavaScript WebSocket example
+const token = "your_jwt_token_here";
+const roomId = "60d5f8b8e6b5f0b3e8b4b5b3";
+const ws = new WebSocket(`ws://localhost:8080/api/ws?token=${token}&room_id=${roomId}`);
+
+ws.onopen = function(event) {
+    console.log("Connected to WebSocket");
+
+    // Send heartbeat to keep connection alive
+    setInterval(() => {
+        ws.send(JSON.stringify({ type: "heartbeat" }));
+    }, 30000); // Every 30 seconds
+};
+
+ws.onmessage = function(event) {
+    const message = JSON.parse(event.data);
+    console.log("Received:", message);
+
+    switch(message.type) {
+        case "connected":
+            console.log("Successfully connected to room:", message.data.room_id);
+            break;
+        case "new_message":
+            console.log("New message in room:", message.chatroom_id, message.data);
+            // Update your UI with the new message
+            break;
+        case "heartbeat_ack":
+            console.log("Heartbeat acknowledged");
+            break;
+    }
+};
+
+ws.onerror = function(error) {
+    console.error("WebSocket error:", error);
+};
+
+ws.onclose = function(event) {
+    console.log("WebSocket connection closed:", event.code, event.reason);
+};
+```
+
+### Error Handling Examples
+
+```bash
+# Example of handling authentication errors
+curl -X GET http://localhost:8080/api/chatrooms \
+  -H "Authorization: Bearer invalid_token"
+
+# Response: 401 Unauthorized
+# {
+#   "error": "Please log in to continue"
+# }
+
+# Example of handling permission errors
+curl -X DELETE http://localhost:8080/api/chatrooms/60d5f8b8e6b5f0b3e8b4b5b3/messages/60d5f8b8e6b5f0b3e8b4b5b4 \
+  -H "Authorization: Bearer $TOKEN"
+
+# Response: 403 Forbidden (if not message owner)
+# {
+#   "error": "You can only delete your own messages"
+# }
+
+# Example of handling validation errors
+curl -X POST http://localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "ab",
+    "email": "invalid-email",
+    "password": "123"
+  }'
+
+# Response: 400 Bad Request
+# {
+#   "error": "Username must be at least 3 characters long"
+# }
+```
+
+### Testing API Endpoints
+
+```bash
+# Health check
+curl -X GET http://localhost:8080/health
+
+# WebSocket token validation
+curl -X GET "http://localhost:8080/api/ws-debug?token=$TOKEN"
+
+# Test file upload with different media types
+curl -X POST http://localhost:8080/api/media/upload \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@/path/to/audio.mp3" \
+  -F "message_type=audio"
+
+curl -X POST http://localhost:8080/api/media/upload \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@/path/to/video.mp4" \
+  -F "message_type=video"
+```
+
+## API Quick Reference
+
+### Complete Endpoint List
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| **Authentication** |
+| POST | `/api/auth/register` | Register new user | ❌ |
+| POST | `/api/auth/login` | Login user | ❌ |
+| POST | `/api/auth/logout` | Logout user | ✅ |
+| **Chatrooms** |
+| GET | `/api/chatrooms` | Get all chatrooms | ✅ |
+| GET | `/api/chatrooms/user` | Get user's joined chatrooms | ✅ |
+| GET | `/api/chatrooms/:id` | Get chatroom by ID | ✅ |
+| POST | `/api/chatrooms` | Create new chatroom | ✅ |
+| POST | `/api/chatrooms/:id/join` | Join chatroom | ✅ |
+| DELETE | `/api/chatrooms/:id` | Delete chatroom (creator only) | ✅ |
+| **Messages** |
+| GET | `/api/chatrooms/:id/messages` | Get messages from chatroom | ✅ |
+| POST | `/api/chatrooms/:id/messages` | Send message to chatroom | ✅ |
+| PUT | `/api/chatrooms/:id/messages/:messageId` | Update message (sender only) | ✅ |
+| DELETE | `/api/chatrooms/:id/messages/:messageId` | Delete message (sender only) | ✅ |
+| **Media** |
+| POST | `/api/media/upload` | Upload media to Cloudinary | ✅ |
+| **WebSocket** |
+| GET | `/api/ws` | WebSocket connection | ✅ |
+| **Utility** |
+| GET | `/health` | Health check | ❌ |
+| GET | `/api/ws-debug` | WebSocket token validation | ❌ |
+| GET | `/swagger/*any` | API documentation | ❌ |
+
+### New Features Summary
+
+#### 🆕 Message Management
+- **Update Messages**: Edit text content and/or replace media files
+- **Delete Messages**: Remove messages and associated media from Cloudinary
+- **Media Cleanup**: Automatic deletion of old media when updating messages
+
+#### 🆕 Chatroom Management
+- **Delete Chatrooms**: Remove entire chatrooms (creator only)
+- **Cascade Deletion**: Automatically deletes all messages and media in the chatroom
+- **Permission Control**: Only chatroom creators can delete their chatrooms
+
+#### 🆕 Enhanced Security
+- **Owner-Only Operations**: Users can only modify their own messages
+- **Creator-Only Operations**: Only chatroom creators can delete chatrooms
+- **Automatic Cleanup**: No orphaned media files left in Cloudinary
+
+#### 🆕 Error Handling
+- **Specific Error Messages**: Clear, actionable error messages for different scenarios
+- **Proper HTTP Status Codes**: RESTful status codes for different error types
+- **Graceful Degradation**: Operations continue even if media deletion fails
+
+### Permission Matrix
+
+| Operation | Permission Required | Notes |
+|-----------|-------------------|-------|
+| Create Chatroom | Authenticated User | User automatically becomes creator and member |
+| Join Chatroom | Authenticated User | Any user can join any chatroom |
+| Delete Chatroom | Chatroom Creator | Only the user who created the chatroom |
+| Send Message | Chatroom Member | User must be a member of the chatroom |
+| Update Message | Message Sender | Only the user who sent the message |
+| Delete Message | Message Sender | Only the user who sent the message |
+| Upload Media | Authenticated User | Any authenticated user can upload media |
 
 ## Database Schema
 
@@ -535,12 +916,13 @@ All API errors follow a consistent JSON format:
 
 ### Business Logic Errors
 
-- **User Already Exists**: `{"error": "user with this email or username already exists"}`
-- **Invalid Credentials**: `{"error": "Invalid email or password"}`
-- **Chatroom Not Found**: `{"error": "chatroom not found"}`
-- **User Not Member**: `{"error": "user is not a member of this chatroom"}`
-- **Already Member**: `{"error": "user is already a member of this chatroom"}`
-- **Invalid Message Type**: `{"error": "invalid message type"}`
+- **Email Already Exists**: `{"error": "An account with this email already exists. Please use a different email address"}`
+- **Username Already Taken**: `{"error": "This username is already taken. Please choose a different username"}`
+- **Invalid Credentials**: `{"error": "Invalid email or password. Please check your credentials and try again"}`
+- **Chatroom Not Found**: `{"error": "Chat room not found. It may have been deleted"}`
+- **User Not Member**: `{"error": "You are not a member of this chat room"}`
+- **Already Member**: `{"error": "You are already a member of this chat room"}`
+- **Invalid Message Type**: `{"error": "Invalid message type selected"}`
 
 ## Media Message Workflow
 

@@ -14,17 +14,19 @@ import (
 
 // MessageService handles business logic related to messages
 type MessageService struct {
-	MongoDB *mongo.Database
-	MsgColl *mongo.Collection
-	ChatSvc *ChatroomService
+	MongoDB       *mongo.Database
+	MsgColl       *mongo.Collection
+	ChatSvc       *ChatroomService
+	CloudinarySvc *CloudinaryService
 }
 
 // NewMessageService creates a new MessageService
-func NewMessageService(mongodb *mongo.Database, chatroomService *ChatroomService) *MessageService {
+func NewMessageService(mongodb *mongo.Database, chatroomService *ChatroomService, cloudinaryService *CloudinaryService) *MessageService {
 	return &MessageService{
-		MongoDB: mongodb,
-		MsgColl: mongodb.Collection("messages"),
-		ChatSvc: chatroomService,
+		MongoDB:       mongodb,
+		MsgColl:       mongodb.Collection("messages"),
+		ChatSvc:       chatroomService,
+		CloudinarySvc: cloudinaryService,
 	}
 }
 
@@ -72,6 +74,8 @@ func (s *MessageService) SendMessage(chatroomID primitive.ObjectID, userID uint,
 		TextContent: textContent,
 		MediaURL:    mediaURL,
 		SentAt:      time.Now(),
+		Edited:      false,
+		EditedAt:    nil,
 	}
 
 	// Save message to MongoDB
@@ -118,7 +122,7 @@ func (s *MessageService) GetMessages(chatroomID primitive.ObjectID, userID uint,
 	return messages, nil
 }
 
-// DeleteMessage deletes a message
+// DeleteMessage deletes a message and its associated media
 func (s *MessageService) DeleteMessage(messageID primitive.ObjectID, userID uint) error {
 	// Find the message
 	var message models.Message
@@ -132,7 +136,17 @@ func (s *MessageService) DeleteMessage(messageID primitive.ObjectID, userID uint
 		return errors.New("user is not the sender of this message")
 	}
 
-	// Delete the message
+	// Delete media from Cloudinary if exists
+	if message.MediaURL != "" && s.CloudinarySvc != nil {
+		err = s.CloudinarySvc.DeleteFile(message.MediaURL)
+		if err != nil {
+			// Log error but don't fail the deletion
+			// In production, you might want to queue this for retry
+			// For now, we'll continue with message deletion
+		}
+	}
+
+	// Delete the message from database
 	_, err = s.MsgColl.DeleteOne(context.Background(), bson.M{"_id": messageID})
 	if err != nil {
 		return errors.New("failed to delete message")
@@ -141,8 +155,8 @@ func (s *MessageService) DeleteMessage(messageID primitive.ObjectID, userID uint
 	return nil
 }
 
-// EditMessage edits a message
-func (s *MessageService) EditMessage(messageID primitive.ObjectID, userID uint, textContent string) (*models.Message, error) {
+// UpdateMessage updates a message with new content and/or media
+func (s *MessageService) UpdateMessage(messageID primitive.ObjectID, userID uint, textContent, newMediaURL string) (*models.Message, error) {
 	// Find the message
 	var message models.Message
 	err := s.MsgColl.FindOne(context.Background(), bson.M{"_id": messageID}).Decode(&message)
@@ -155,20 +169,38 @@ func (s *MessageService) EditMessage(messageID primitive.ObjectID, userID uint, 
 		return nil, errors.New("user is not the sender of this message")
 	}
 
+	// If media URL is being changed, delete the old media from Cloudinary
+	if message.MediaURL != "" && message.MediaURL != newMediaURL && s.CloudinarySvc != nil {
+		err = s.CloudinarySvc.DeleteFile(message.MediaURL)
+		if err != nil {
+			// Log error but don't fail the update
+			// In production, you might want to queue this for retry
+		}
+	}
+
+	// Prepare update fields
+	updateFields := bson.M{
+		"text_content": textContent,
+		"edited":       true,
+		"edited_at":    time.Now(),
+	}
+
+	// Update media URL if provided
+	if newMediaURL != "" {
+		updateFields["media_url"] = newMediaURL
+	} else if message.MediaURL != "" && newMediaURL == "" {
+		// If removing media, set to empty string
+		updateFields["media_url"] = ""
+	}
+
 	// Update the message
 	_, err = s.MsgColl.UpdateOne(
 		context.Background(),
 		bson.M{"_id": messageID},
-		bson.M{
-			"$set": bson.M{
-				"text_content": textContent,
-				"edited":       true,
-				"edited_at":    time.Now(),
-			},
-		},
+		bson.M{"$set": updateFields},
 	)
 	if err != nil {
-		return nil, errors.New("failed to edit message")
+		return nil, errors.New("failed to update message")
 	}
 
 	// Get the updated message
@@ -178,4 +210,46 @@ func (s *MessageService) EditMessage(messageID primitive.ObjectID, userID uint, 
 	}
 
 	return &message, nil
+}
+
+// EditMessage edits only the text content of a message (legacy function for backward compatibility)
+func (s *MessageService) EditMessage(messageID primitive.ObjectID, userID uint, textContent string) (*models.Message, error) {
+	return s.UpdateMessage(messageID, userID, textContent, "")
+}
+
+// DeleteAllMessagesInChatroom deletes all messages in a chatroom and their associated media
+func (s *MessageService) DeleteAllMessagesInChatroom(chatroomID primitive.ObjectID) error {
+	// Find all messages in the chatroom
+	cursor, err := s.MsgColl.Find(context.Background(), bson.M{"chatroom_id": chatroomID})
+	if err != nil {
+		return errors.New("failed to find messages")
+	}
+	defer cursor.Close(context.Background())
+
+	// Delete media files from Cloudinary for each message
+	if s.CloudinarySvc != nil {
+		for cursor.Next(context.Background()) {
+			var message models.Message
+			if err := cursor.Decode(&message); err != nil {
+				continue // Skip this message if decode fails
+			}
+
+			// Delete media if exists
+			if message.MediaURL != "" {
+				err = s.CloudinarySvc.DeleteFile(message.MediaURL)
+				if err != nil {
+					// Log error but continue with other deletions
+					// In production, you might want to queue failed deletions for retry
+				}
+			}
+		}
+	}
+
+	// Delete all messages from database
+	_, err = s.MsgColl.DeleteMany(context.Background(), bson.M{"chatroom_id": chatroomID})
+	if err != nil {
+		return errors.New("failed to delete messages")
+	}
+
+	return nil
 }

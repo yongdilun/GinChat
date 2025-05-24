@@ -23,10 +23,15 @@ func NewUserService(db *gorm.DB) *UserService {
 
 // Register creates a new user
 func (s *UserService) Register(username, email, password, role string) (*models.User, error) {
-	// Check if user already exists
+	// Check if email already exists
 	var existingUser models.User
-	if result := s.DB.Where("email = ?", email).Or("username = ?", username).First(&existingUser); result.Error == nil {
-		return nil, errors.New("user with this email or username already exists")
+	if result := s.DB.Where("email = ?", email).First(&existingUser); result.Error == nil {
+		return nil, errors.New("user with this email already exists")
+	}
+
+	// Check if username already exists
+	if result := s.DB.Where("username = ?", username).First(&existingUser); result.Error == nil {
+		return nil, errors.New("user with this username already exists")
 	}
 
 	// Hash the password
@@ -119,13 +124,13 @@ func (s *UserService) UpdateUser(user *models.User) error {
 func (s *UserService) HashPassword(password string) (string, error) {
 	// Use a higher cost factor for better security (12 is a good balance between security and performance)
 	cost := 12
-	
+
 	// Generate a salt and hash the password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), cost)
 	if err != nil {
 		return "", err
 	}
-	
+
 	return string(hashedPassword), nil
 }
 

@@ -85,7 +85,7 @@ func (s *ChatroomService) GetUserChatrooms(userID uint) ([]models.Chatroom, erro
 	filter := bson.M{
 		"members.user_id": userID,
 	}
-	
+
 	cursor, err := s.ChatColl.Find(context.Background(), filter)
 	if err != nil {
 		return nil, errors.New("failed to get user chatrooms")
@@ -192,4 +192,34 @@ func (s *ChatroomService) IsMember(chatroom *models.Chatroom, userID uint) bool 
 		}
 	}
 	return false
+}
+
+// DeleteChatroom deletes a chatroom and all its messages (only creator can delete)
+func (s *ChatroomService) DeleteChatroom(chatroomID primitive.ObjectID, userID uint, messageService *MessageService) error {
+	// Check if chatroom exists
+	chatroom, err := s.GetChatroomByID(chatroomID)
+	if err != nil {
+		return err
+	}
+
+	// Check if the user is the creator of the chatroom
+	if chatroom.CreatedBy != userID {
+		return errors.New("only the creator can delete this chatroom")
+	}
+
+	// Delete all messages in the chatroom (including media)
+	if messageService != nil {
+		err = messageService.DeleteAllMessagesInChatroom(chatroomID)
+		if err != nil {
+			return errors.New("failed to delete chatroom messages")
+		}
+	}
+
+	// Delete the chatroom
+	_, err = s.ChatColl.DeleteOne(context.Background(), bson.M{"_id": chatroomID})
+	if err != nil {
+		return errors.New("failed to delete chatroom")
+	}
+
+	return nil
 }

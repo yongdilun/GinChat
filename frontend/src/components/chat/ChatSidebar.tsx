@@ -4,6 +4,7 @@ import { User, Chatroom } from '@/types';
 import { chatroomAPI } from '@/services/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { XIcon } from '@heroicons/react/outline';
+import ChatroomActions from './ChatroomActions';
 
 interface ChatSidebarProps {
   user: User | null;
@@ -11,6 +12,7 @@ interface ChatSidebarProps {
   selectedChatroom: Chatroom | null;
   onSelectChatroom: (chatroom: Chatroom) => void;
   onChatroomsRefresh: () => void;
+  onDeleteChatroom?: (chatroomId: string) => void;
 }
 
 // Replace LogoutIcon with inline SVG
@@ -47,6 +49,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
   selectedChatroom,
   onSelectChatroom,
   onChatroomsRefresh,
+  onDeleteChatroom,
 }) => {
   const router = useRouter();
   const [showChatroomOptions, setShowChatroomOptions] = useState(false);
@@ -151,7 +154,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
   };
 
   return (
-    <motion.div 
+    <motion.div
       className={`bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col h-full ${
         isSidebarCollapsed ? 'w-20' : 'w-80'
       } transition-all duration-300 ease-in-out`}
@@ -166,14 +169,14 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
       }`}>
         <div className="flex justify-between items-center mb-2">
           <div className={`flex ${isSidebarCollapsed ? 'flex-col items-center' : 'items-center'}`}>
-            <motion.div 
+            <motion.div
               className="w-12 h-12 rounded-full bg-gradient-to-r from-primary-500 to-primary-600 flex items-center justify-center text-white font-bold text-lg"
               whileHover={{ scale: 1.1 }}
               transition={{ type: 'spring', stiffness: 400, damping: 10 }}
             >
               {user?.username.charAt(0).toUpperCase()}
             </motion.div>
-            
+
             {!isSidebarCollapsed && (
               <div className="ml-3">
                 <p className="font-medium">{user?.username}</p>
@@ -183,17 +186,17 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
               </div>
             )}
           </div>
-          
-          <button 
+
+          <button
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
             className="p-1.5 rounded-md bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 focus:outline-none"
             title={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            <motion.svg 
-              xmlns="http://www.w3.org/2000/svg" 
-              className="h-4 w-4" 
-              fill="none" 
-              viewBox="0 0 24 24" 
+            <motion.svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
               stroke="currentColor"
               animate={{ rotate: isSidebarCollapsed ? 0 : 180 }}
               transition={{ duration: 0.3 }}
@@ -202,7 +205,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
             </motion.svg>
           </button>
         </div>
-        
+
         {!isSidebarCollapsed && (
           <motion.button
             onClick={handleLogout}
@@ -214,7 +217,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
             Logout
           </motion.button>
         )}
-        
+
         {isSidebarCollapsed && (
           <motion.button
             onClick={handleLogout}
@@ -263,7 +266,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
       {/* Chatroom options */}
       <AnimatePresence>
         {showChatroomOptions && !isSidebarCollapsed && (
-          <motion.div 
+          <motion.div
             className="p-4 border-b border-gray-200 dark:border-gray-700"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
@@ -318,8 +321,8 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
       {/* Create chatroom form */}
       <AnimatePresence>
         {showCreateChatroom && !isSidebarCollapsed && (
-          <motion.form 
-            onSubmit={createChatroom} 
+          <motion.form
+            onSubmit={createChatroom}
             className="p-4 border-b border-gray-200 dark:border-gray-700"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
@@ -370,7 +373,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
       {/* Join chatroom form */}
       <AnimatePresence>
         {showJoinChatroom && !isSidebarCollapsed && (
-          <motion.div 
+          <motion.div
             className="p-4 border-b border-gray-200 dark:border-gray-700"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
@@ -390,7 +393,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
               <div className="mb-2 text-sm text-red-600">{error}</div>
             )}
             {availableChatrooms.length > 0 ? (
-              <motion.ul 
+              <motion.ul
                 className="border border-gray-200 dark:border-gray-600 rounded-md overflow-hidden"
                 initial="hidden"
                 animate="visible"
@@ -405,8 +408,8 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                 }}
               >
                 {availableChatrooms.map((chatroom) => (
-                  <motion.li 
-                    key={chatroom.id} 
+                  <motion.li
+                    key={chatroom.id}
                     className="border-b border-gray-200 dark:border-gray-600 last:border-b-0"
                     variants={{
                       hidden: { opacity: 0, y: 10 },
@@ -472,42 +475,55 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                 }}
               >
                 {joinedChatrooms.map((chatroom) => (
-                  <motion.li 
+                  <motion.li
                     key={chatroom.id}
                     variants={{
                       hidden: { opacity: 0, x: -20 },
                       visible: { opacity: 1, x: 0 }
                     }}
                   >
-                    <motion.button
-                      onClick={() => onSelectChatroom(chatroom)}
-                      className={`w-full text-left ${isSidebarCollapsed ? 'py-3 px-0' : 'px-4 py-3'} hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
-                        selectedChatroom?.id === chatroom.id ? 'bg-primary-50 dark:bg-gray-700 border-l-4 border-primary-500' : ''
-                      } flex items-center`}
-                      whileHover={{ x: isSidebarCollapsed ? 0 : 4 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <div className={`w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold ${
-                        isSidebarCollapsed ? 'mx-auto' : 'mr-3'
-                      }`}>
-                        {chatroom.name.charAt(0).toUpperCase()}
-                      </div>
-                      {!isSidebarCollapsed && (
-                        <div className="overflow-hidden">
-                          <p className={`font-medium truncate ${
-                            selectedChatroom?.id === chatroom.id ? 'text-primary-600 dark:text-primary-400' : ''
-                          }`}>{chatroom.name}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                            {chatroom.members.length} member{chatroom.members.length !== 1 ? 's' : ''}
-                          </p>
+                    <div className={`${isSidebarCollapsed ? 'py-3 px-0' : 'px-4 py-3'} hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+                      selectedChatroom?.id === chatroom.id ? 'bg-primary-50 dark:bg-gray-700 border-l-4 border-primary-500' : ''
+                    } flex items-center group`}>
+                      <motion.button
+                        onClick={() => onSelectChatroom(chatroom)}
+                        className="flex items-center flex-1"
+                        whileHover={{ x: isSidebarCollapsed ? 0 : 4 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        <div className={`w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold ${
+                          isSidebarCollapsed ? 'mx-auto' : 'mr-3'
+                        }`}>
+                          {chatroom.name.charAt(0).toUpperCase()}
+                        </div>
+                        {!isSidebarCollapsed && (
+                          <div className="overflow-hidden flex-1">
+                            <p className={`font-medium truncate ${
+                              selectedChatroom?.id === chatroom.id ? 'text-primary-600 dark:text-primary-400' : ''
+                            }`}>{chatroom.name}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                              {chatroom.members.length} member{chatroom.members.length !== 1 ? 's' : ''}
+                            </p>
+                          </div>
+                        )}
+                      </motion.button>
+
+                      {/* Chatroom Actions */}
+                      {!isSidebarCollapsed && onDeleteChatroom && (
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                          <ChatroomActions
+                            chatroom={chatroom}
+                            user={user}
+                            onDelete={onDeleteChatroom}
+                          />
                         </div>
                       )}
-                    </motion.button>
+                    </div>
                   </motion.li>
                 ))}
               </motion.ul>
             ) : (
-              <motion.div 
+              <motion.div
                 className={`${isSidebarCollapsed ? 'px-2' : 'px-4'} py-4 text-gray-500 dark:text-gray-400 text-center`}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}

@@ -41,7 +41,7 @@ api.interceptors.response.use(
     if (!isBrowser) {
       return Promise.reject(error);
     }
-    
+
     // Handle 401 Unauthorized errors (token expired or invalid)
     if (error.response) {
       // Only redirect to session expired if:
@@ -49,8 +49,8 @@ api.interceptors.response.use(
       // 2. We're not already on the login page AND
       // 3. The request is not a login attempt
       const isLoginAttempt = error.config?.url?.includes('/api/auth/login');
-      if (error.response.status === 401 && 
-          window.location.pathname !== '/auth/login' && 
+      if (error.response.status === 401 &&
+          window.location.pathname !== '/auth/login' &&
           !isLoginAttempt) {
         // Clear local storage and redirect to login
         localStorage.removeItem('token');
@@ -83,7 +83,7 @@ export const authAPI = {
   logout: async () => {
     try {
       const response = await api.post('/api/auth/logout');
-      
+
       if (isBrowser) {
       // Clear local storage
       localStorage.removeItem('token');
@@ -91,7 +91,7 @@ export const authAPI = {
       // Redirect to login with logout parameter
       window.location.href = '/auth/login?session=logout';
       }
-      
+
       return response;
     } catch (error) {
       if (isBrowser) {
@@ -119,6 +119,9 @@ export const chatroomAPI = {
   joinChatroom: (chatroomId: string) => {
     return api.post(`/api/chatrooms/${chatroomId}/join`);
   },
+  deleteChatroom: (chatroomId: string) => {
+    return api.delete(`/api/chatrooms/${chatroomId}`);
+  },
 };
 
 // Message API
@@ -133,7 +136,15 @@ export const messageAPI = {
       media_url: mediaURL,
     });
   },
-
+  updateMessage: (chatroomId: string, messageId: string, textContent?: string, mediaURL?: string) => {
+    return api.put(`/api/chatrooms/${chatroomId}/messages/${messageId}`, {
+      text_content: textContent,
+      media_url: mediaURL,
+    });
+  },
+  deleteMessage: (chatroomId: string, messageId: string) => {
+    return api.delete(`/api/chatrooms/${chatroomId}/messages/${messageId}`);
+  },
   uploadMedia: (file: File, messageType: string) => {
     const formData = new FormData();
     formData.append('file', file);

@@ -3,6 +3,7 @@ import Image from 'next/image';
 import { User, Chatroom, Message } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { XIcon } from '@heroicons/react/outline';
+import MessageActions from './MessageActions';
 
 // ArrowDownIcon as inline SVG
 const ArrowDownIcon = ({ className }: { className?: string }) => (
@@ -24,11 +25,22 @@ interface MessageListProps {
   messages: Message[];
   onShowJoinChatroom?: () => void;
   onShowCreateChatroom?: () => void;
+  onEditMessage?: (messageId: string, newContent: string, newMediaUrl?: string) => void;
+  onDeleteMessage?: (messageId: string) => void;
 }
 
-const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messages, onShowJoinChatroom, onShowCreateChatroom }) => {
+const MessageList: React.FC<MessageListProps> = ({
+  user,
+  selectedChatroom,
+  messages,
+  onShowJoinChatroom,
+  onShowCreateChatroom,
+  onEditMessage,
+  onDeleteMessage
+}) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -45,10 +57,10 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
     // Get the filename from the URL path
     const urlParts = url.split('/');
     let filename = urlParts[urlParts.length - 1];
-    
+
     // Remove query parameters if any
     filename = filename.split('?')[0];
-    
+
     // Make sure we have a valid filename
     return filename || 'download';
   };
@@ -62,16 +74,16 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
         .then(blob => {
           // Create a blob URL for the image
           const blobUrl = URL.createObjectURL(blob);
-          
+
     // Create a temporary link element
           const link = document.createElement('a');
           link.href = blobUrl;
           link.download = filename || 'image';
-          
+
           // Append to body, click and remove
           document.body.appendChild(link);
           link.click();
-          
+
           // Clean up
           document.body.removeChild(link);
           URL.revokeObjectURL(blobUrl);
@@ -111,7 +123,7 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
             Choose a chatroom from the sidebar or create a new one to start chatting with others.
           </p>
           <div className="flex space-x-3">
-            <motion.button 
+            <motion.button
               onClick={onShowJoinChatroom}
               className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg flex items-center text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer"
               whileHover={{ scale: 1.05 }}
@@ -123,8 +135,8 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
               </svg>
               <span className="text-sm">Join a Chatroom</span>
             </motion.button>
-            
-            <motion.button 
+
+            <motion.button
               onClick={onShowCreateChatroom}
               className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg flex items-center text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer"
               whileHover={{ scale: 1.05 }}
@@ -152,26 +164,26 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
       }
     }
   };
-  
+
   const messageVariants = {
     hidden: { opacity: 0, scale: 0.8, y: 20 },
-    visible: { 
-      opacity: 1, 
-      scale: 1, 
+    visible: {
+      opacity: 1,
+      scale: 1,
       y: 0,
-      transition: { 
+      transition: {
         type: "spring",
         stiffness: 260,
-        damping: 20 
-      } 
+        damping: 20
+      }
     }
   };
 
   return (
     <div className="h-full overflow-y-auto overscroll-contain p-4 bg-gray-50 dark:bg-gray-900 flex flex-col relative">
       {/* Chat background with pattern */}
-      <div className="absolute inset-0 opacity-5 dark:opacity-10 pointer-events-none" 
-          style={{ 
+      <div className="absolute inset-0 opacity-5 dark:opacity-10 pointer-events-none"
+          style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23000000' fill-opacity='0.1' fill-rule='evenodd'/%3E%3C/svg%3E")`,
             backgroundSize: '300px 300px'
           }}>
@@ -180,7 +192,7 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
       {/* Image Viewer Modal */}
       <AnimatePresence>
         {expandedImage && (
-          <motion.div 
+          <motion.div
             className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-90"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -228,7 +240,7 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
 
       <div className="flex-1"></div> {/* Spacer to push messages to the bottom */}
       {messages.length > 0 ? (
-        <motion.div 
+        <motion.div
           className="space-y-4 z-20"
           variants={containerVariants}
           initial="hidden"
@@ -240,7 +252,7 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
               variants={messageVariants}
               initial="hidden"
               animate="visible"
-              transition={{ 
+              transition={{
                 delay: index * 0.05,
                 duration: 0.3
               }}
@@ -249,7 +261,7 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
               }`}
             >
               <div
-                className={`inline-block px-4 py-2 rounded-lg max-w-[75%] shadow-sm hover:shadow-md transition-shadow duration-200 ${
+                className={`inline-block px-4 py-2 rounded-lg max-w-[75%] shadow-sm hover:shadow-md transition-shadow duration-200 group ${
                   message.sender_id === user?.user_id
                     ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-br-none'
                     : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-bl-none'
@@ -257,8 +269,8 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
               >
                 <div className="flex items-center mb-1">
                   <div className={`w-5 h-5 rounded-full ${
-                    message.sender_id === user?.user_id 
-                      ? 'bg-primary-300' 
+                    message.sender_id === user?.user_id
+                      ? 'bg-primary-300'
                       : 'bg-gray-300 dark:bg-gray-600'
                   } flex items-center justify-center text-xs mr-1`}>
                     {message.sender_name.charAt(0).toUpperCase()}
@@ -269,9 +281,9 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
                 {message.text_content && (
                   <p className="whitespace-pre-wrap break-words">{message.text_content}</p>
                 )}
-                
+
                 {message.media_url && (
-                  <motion.div 
+                  <motion.div
                     className="mt-2 relative group"
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -349,26 +361,48 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
                     ) : null}
                   </motion.div>
                 )}
-                
-                <p className="text-xs opacity-70 mt-1 text-right">
-                  {new Date(message.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </p>
+
+                <div className="flex items-center justify-between mt-1">
+                  <div className="flex items-center">
+                    {message.edited && (
+                      <span className="text-xs opacity-50 mr-2 italic">
+                        edited
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs opacity-70">
+                    {new Date(message.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+
+                {/* Message Actions */}
+                {onEditMessage && onDeleteMessage && (
+                  <MessageActions
+                    message={message}
+                    user={user}
+                    onEdit={onEditMessage}
+                    onDelete={onDeleteMessage}
+                    isEditing={editingMessageId === message.id}
+                    onStartEdit={() => setEditingMessageId(message.id)}
+                    onCancelEdit={() => setEditingMessageId(null)}
+                  />
+                )}
               </div>
             </motion.div>
           ))}
         </motion.div>
       ) : (
-        <motion.div 
+        <motion.div
           className="flex flex-col items-center justify-center flex-1"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 1 }}
         >
-          <motion.div 
+          <motion.div
             className="w-20 h-20 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center mb-4 relative"
             initial={{ scale: 0 }}
             animate={{ scale: 1, rotate: 360 }}
-            transition={{ 
+            transition={{
               type: "spring",
               stiffness: 260,
               damping: 20,
@@ -384,7 +418,7 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
               </svg>
             </div>
           </motion.div>
-          <motion.h3 
+          <motion.h3
             className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-2"
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -392,7 +426,7 @@ const MessageList: React.FC<MessageListProps> = ({ user, selectedChatroom, messa
           >
             Start a Conversation
           </motion.h3>
-          <motion.p 
+          <motion.p
             className="text-center text-gray-500 dark:text-gray-400 max-w-xs"
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}

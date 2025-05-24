@@ -62,10 +62,17 @@ export interface Message {
   text_content?: string;
   media_url?: string;
   sent_at: string;
+  edited?: boolean;
+  edited_at?: string;
 }
 
 export interface SendMessageRequest {
   message_type: Message['message_type'];
+  text_content?: string;
+  media_url?: string;
+}
+
+export interface UpdateMessageRequest {
   text_content?: string;
   media_url?: string;
 }

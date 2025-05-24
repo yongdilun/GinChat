@@ -116,8 +116,10 @@ func FormatServiceError(err error) string {
 
 	switch errMsg {
 	// User service errors
-	case "user with this email or username already exists":
-		return "An account with this email or username already exists. Please try a different one"
+	case "user with this email already exists":
+		return "An account with this email already exists. Please use a different email address"
+	case "user with this username already exists":
+		return "This username is already taken. Please choose a different username"
 	case "invalid email or password":
 		return "Invalid email or password. Please check your credentials and try again"
 	case "user not found":
@@ -160,6 +162,24 @@ func FormatServiceError(err error) string {
 		return "Please upload a file along with your message"
 	case "invalid message type":
 		return "Invalid message type selected"
+	case "message not found":
+		return "Message not found. It may have been deleted"
+	case "user is not the sender of this message":
+		return "You can only modify your own messages"
+	case "failed to update message":
+		return "Unable to update message. Please try again later"
+	case "failed to delete message":
+		return "Unable to delete message. Please try again later"
+	case "failed to find messages":
+		return "Unable to load messages. Please try again later"
+	case "failed to delete messages":
+		return "Unable to delete messages. Please try again later"
+	case "failed to delete chatroom messages":
+		return "Unable to delete chatroom messages. Please try again later"
+	case "only the creator can delete this chatroom":
+		return "Only the chatroom creator can delete this chatroom"
+	case "failed to delete chatroom":
+		return "Unable to delete chatroom. Please try again later"
 
 	// Media service errors
 	case "file size exceeds the 10MB limit":

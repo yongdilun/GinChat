@@ -18,7 +18,7 @@ interface Media {
 }
 
 // Welcome component for when no chatroom is selected
-const WelcomePage = ({ user, onCreateChatroom, onJoinChatroom }: { 
+const WelcomePage = ({ user, onCreateChatroom, onJoinChatroom }: {
   user: User | null;
   onCreateChatroom: () => void;
   onJoinChatroom: () => void;
@@ -30,15 +30,15 @@ const WelcomePage = ({ user, onCreateChatroom, onJoinChatroom }: {
           <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-r from-primary-500 to-primary-600 flex items-center justify-center text-white text-2xl font-bold shadow-lg">
             {user?.username?.charAt(0).toUpperCase() || 'G'}
           </div>
-          
+
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">
             Welcome to GinChat, {user?.username || 'User'}!
           </h1>
-          
+
           <p className="text-gray-600 dark:text-gray-300 mb-8">
             Connect with others by joining an existing chatroom or create your own to start chatting.
           </p>
-          
+
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
               onClick={onCreateChatroom}
@@ -49,7 +49,7 @@ const WelcomePage = ({ user, onCreateChatroom, onJoinChatroom }: {
               </svg>
               Create a Chatroom
             </button>
-            
+
             <button
               onClick={onJoinChatroom}
               className="px-6 py-3 bg-green-500 text-white font-medium rounded-lg shadow-md hover:bg-green-600 transition-colors flex items-center justify-center"
@@ -60,7 +60,7 @@ const WelcomePage = ({ user, onCreateChatroom, onJoinChatroom }: {
               Join a Chatroom
             </button>
           </div>
-          
+
           <div className="mt-12 px-6 py-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
             <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">Getting Started</h2>
             <ul className="space-y-2 text-left text-sm text-gray-600 dark:text-gray-300">
@@ -114,12 +114,12 @@ export default function ChatPage() {
 
     // Extract media from messages
     const media: Media[] = [];
-    
+
     // Process messages to extract media
     messages.forEach(message => {
       if (message.media_url) {
         let type = 'image'; // Default type
-        
+
         if (message.message_type.includes('video')) {
           type = 'video';
         } else if (message.message_type.includes('audio')) {
@@ -127,17 +127,17 @@ export default function ChatPage() {
         } else if (message.message_type.includes('picture')) {
           type = 'image';
         }
-        
+
         media.push({
           url: message.media_url,
           type: type
         });
       }
     });
-    
+
     setChatroomMedia(media);
     console.log(`Processed ${media.length} media files from messages`);
-    
+
   }, [messages]);
 
   // Add a message to the chat if it hasn't been added already
@@ -151,11 +151,11 @@ export default function ChatPage() {
     // Mark the message as processed
     processedMessageIdsRef.current.add(newMessage.id);
     console.log('Adding new message to chat:', newMessage);
-    
+
     // Add to messages state
     setMessages(prevMessages => [...prevMessages, newMessage]);
   }, []);
-  
+
   // WebSocket connection for real-time updates
   const handleWebSocketMessage = useCallback((event: MessageEvent) => {
     try {
@@ -179,7 +179,7 @@ export default function ChatPage() {
   // Create enhanced chatroom with media
   const enhancedSelectedChatroom = useMemo(() => {
     if (!selectedChatroom) return null;
-    
+
     return {
       ...selectedChatroom,
       media: chatroomMedia,
@@ -195,7 +195,7 @@ export default function ChatPage() {
     if (token && selectedChatroom) {
       const wsBaseUrl = process.env.NEXT_PUBLIC_WS_URL;
       setWsUrl(`${wsBaseUrl}/api/ws?token=${encodeURIComponent(token)}&room_id=${encodeURIComponent(selectedChatroom.id)}`);
-      
+
       // Clear processed messages when changing rooms
       processedMessageIdsRef.current = new Set();
     } else {
@@ -229,7 +229,7 @@ export default function ChatPage() {
   useEffect(() => {
     // Store the current disconnect function
     disconnectRef.current = disconnect;
-    
+
     // Cleanup function - this runs when the component unmounts or before the next effect runs
     return () => {
       if (disconnectRef.current) {
@@ -244,7 +244,7 @@ export default function ChatPage() {
     if (hasFetchedData) {
       return; // Skip if already fetched
     }
-    
+
     setIsLoading(true);
     try {
       const response = await chatroomAPI.getChatrooms();
@@ -253,7 +253,7 @@ export default function ChatPage() {
 
       // Don't automatically select any chatroom on login
       // Let the user choose which chatroom to enter
-      
+
       // Mark that we've fetched data
       setHasFetchedData(true);
     } catch (err: unknown) {
@@ -266,26 +266,26 @@ export default function ChatPage() {
 
   // Update the fetch messages function to use a similar flag
   const fetchMessagesRef = useRef<{[chatroomId: string]: boolean}>({});
-  
+
   // Fetch messages for a chatroom
   const fetchMessages = async (chatroomId: string) => {
     // Skip if we've already fetched messages for this chatroom
     if (fetchMessagesRef.current[chatroomId]) {
       return;
     }
-    
+
     try {
       const response = await messageAPI.getMessages(chatroomId);
       // Reverse the messages to display oldest first (chronological order)
       const messagesData = response.data.messages || [];
       setMessages([...messagesData].reverse());
-      
+
       // Clear and repopulate processed message IDs with fetched messages
       processedMessageIdsRef.current = new Set();
       messagesData.forEach((msg: Message) => {
         processedMessageIdsRef.current.add(msg.id);
       });
-      
+
       // Mark this chatroom's messages as fetched
       fetchMessagesRef.current[chatroomId] = true;
     } catch (err: unknown) {
@@ -318,9 +318,9 @@ export default function ChatPage() {
     if (selectedChatroom?.id === chatroom.id) {
       return; // Skip if same chatroom is selected
     }
-    
+
     setSelectedChatroom(chatroom);
-    
+
     // Allow fetching messages for this chatroom again if manually selected
     fetchMessagesRef.current[chatroom.id] = false;
     fetchMessages(chatroom.id);
@@ -331,7 +331,7 @@ export default function ChatPage() {
     // Reset fetch flags to allow fetching again
     setHasFetchedData(false);
     fetchMessagesRef.current = {};
-    
+
     try {
       // Directly fetch chatrooms once instead of calling fetchChatrooms
       // which will check hasFetchedData and potentially not fetch
@@ -350,25 +350,92 @@ export default function ChatPage() {
     }
   }, []);
 
+  // Handle message update
+  const handleEditMessage = useCallback(async (messageId: string, newContent: string, newMediaUrl?: string) => {
+    if (!selectedChatroom) return;
+
+    try {
+      const response = await messageAPI.updateMessage(selectedChatroom.id, messageId, newContent, newMediaUrl);
+      const updatedMessage = response.data.message;
+
+      // Update the message in the local state
+      setMessages(prevMessages =>
+        prevMessages.map(msg =>
+          msg.id === messageId ? updatedMessage : msg
+        )
+      );
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { error?: string } } };
+      console.error('Error updating message:', error.response?.data?.error || 'An error occurred');
+      alert(error.response?.data?.error || 'Failed to update message');
+    }
+  }, [selectedChatroom]);
+
+  // Handle message deletion
+  const handleDeleteMessage = useCallback(async (messageId: string) => {
+    if (!selectedChatroom) return;
+
+    try {
+      await messageAPI.deleteMessage(selectedChatroom.id, messageId);
+
+      // Remove the message from the local state
+      setMessages(prevMessages =>
+        prevMessages.filter(msg => msg.id !== messageId)
+      );
+
+      // Remove from processed messages set
+      processedMessageIdsRef.current.delete(messageId);
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { error?: string } } };
+      console.error('Error deleting message:', error.response?.data?.error || 'An error occurred');
+      alert(error.response?.data?.error || 'Failed to delete message');
+    }
+  }, [selectedChatroom]);
+
+  // Handle chatroom deletion
+  const handleDeleteChatroom = useCallback(async (chatroomId: string) => {
+    try {
+      await chatroomAPI.deleteChatroom(chatroomId);
+
+      // Remove the chatroom from the local state
+      setChatrooms(prevChatrooms =>
+        prevChatrooms.filter(chatroom => chatroom.id !== chatroomId)
+      );
+
+      // If the deleted chatroom was selected, clear selection
+      if (selectedChatroom?.id === chatroomId) {
+        setSelectedChatroom(null);
+        setMessages([]);
+      }
+
+      // Clear fetch flag for this chatroom
+      delete fetchMessagesRef.current[chatroomId];
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { error?: string } } };
+      console.error('Error deleting chatroom:', error.response?.data?.error || 'An error occurred');
+      alert(error.response?.data?.error || 'Failed to delete chatroom');
+    }
+  }, [selectedChatroom]);
+
   // Helper functions to handle creating/joining chatrooms from the welcome page
   const handleShowCreateChatroom = useCallback(() => {
     // Find sidebar and check if it's collapsed
     const sidebarElement = document.querySelector('[data-sidebar]');
     if (!sidebarElement) return;
-    
+
     const isCollapsed = sidebarElement.classList.contains('w-20');
-    
+
     if (isCollapsed) {
       // Expand sidebar first
       const expandButton = sidebarElement.querySelector('button[title="Expand sidebar"]') as HTMLButtonElement;
       expandButton?.click();
-      
+
       // Wait for animation to complete then show create form
       setTimeout(() => {
         // Click add button
         const addButton = document.getElementById('add-chatroom-button') as HTMLButtonElement;
         if (addButton) addButton.click();
-        
+
         // After options panel opens, click create button
         setTimeout(() => {
           const createButton = document.getElementById('create-chatroom-button') as HTMLButtonElement;
@@ -380,32 +447,32 @@ export default function ChatPage() {
       // First make sure options are shown
       const addButton = document.getElementById('add-chatroom-button') as HTMLButtonElement;
       if (addButton) addButton.click();
-      
+
       setTimeout(() => {
         const createButton = document.getElementById('create-chatroom-button') as HTMLButtonElement;
         if (createButton) createButton.click();
       }, 100);
     }
   }, []);
-  
+
   const handleShowJoinChatroom = useCallback(() => {
     // Find sidebar and check if it's collapsed
     const sidebarElement = document.querySelector('[data-sidebar]');
     if (!sidebarElement) return;
-    
+
     const isCollapsed = sidebarElement.classList.contains('w-20');
-    
+
     if (isCollapsed) {
       // Expand sidebar first
       const expandButton = sidebarElement.querySelector('button[title="Expand sidebar"]') as HTMLButtonElement;
       expandButton?.click();
-      
+
       // Wait for animation to complete then show join form
       setTimeout(() => {
         // Click add button
         const addButton = document.getElementById('add-chatroom-button') as HTMLButtonElement;
         if (addButton) addButton.click();
-        
+
         // After options panel opens, click join button
         setTimeout(() => {
           const joinButton = document.getElementById('join-chatroom-button') as HTMLButtonElement;
@@ -417,7 +484,7 @@ export default function ChatPage() {
       // First make sure options are shown
       const addButton = document.getElementById('add-chatroom-button') as HTMLButtonElement;
       if (addButton) addButton.click();
-      
+
       setTimeout(() => {
         const joinButton = document.getElementById('join-chatroom-button') as HTMLButtonElement;
         if (joinButton) joinButton.click();
@@ -448,6 +515,7 @@ export default function ChatPage() {
           selectedChatroom={selectedChatroom}
           onSelectChatroom={handleSelectChatroom}
           onChatroomsRefresh={handleManualRefresh}
+          onDeleteChatroom={handleDeleteChatroom}
         />
 
         {/* Chat area */}
@@ -455,8 +523,8 @@ export default function ChatPage() {
           {selectedChatroom ? (
             <>
               {/* Chat header - using enhancedSelectedChatroom with media */}
-          <ChatHeader 
-                chatroom={enhancedSelectedChatroom} 
+          <ChatHeader
+                chatroom={enhancedSelectedChatroom}
           />
 
           {/* Messages */}
@@ -467,6 +535,8 @@ export default function ChatPage() {
               messages={messages}
                   onShowJoinChatroom={handleShowJoinChatroom}
                   onShowCreateChatroom={handleShowCreateChatroom}
+                  onEditMessage={handleEditMessage}
+                  onDeleteMessage={handleDeleteMessage}
             />
           </div>
 
@@ -483,7 +553,7 @@ export default function ChatPage() {
           />
             </>
           ) : (
-            <WelcomePage 
+            <WelcomePage
               user={user}
               onCreateChatroom={handleShowCreateChatroom}
               onJoinChatroom={handleShowJoinChatroom}
