@@ -129,7 +129,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
     }
 
     // Debug logging
-    console.log(`Looking for unread count for chatroom ID: "${chatroomId}"`);
+    console.log(`Looking for unread count for chatroom ID: ${chatroomId}`);
     console.log('Available unread counts:', unreadCounts.map(count => ({
       chatroom_id: count.chatroom_id,
       chatroom_name: count.chatroom_name,
@@ -137,7 +137,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
     })));
 
     const unreadData = unreadCounts.find(count => count.chatroom_id === chatroomId);
-    console.log(`Found unread data for "${chatroomId}":`, unreadData);
+    console.log(`Found unread data for ${chatroomId}:`, unreadData);
 
     return unreadData?.unread_count || 0;
   };
@@ -366,7 +366,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                   <p className="font-semibold">Unread data:</p>
                   {unreadCounts.map((count, index) => (
                     <p key={index} className="text-xs">
-                      ID: "{count.chatroom_id}" | Name: "{count.chatroom_name}" | Count: {count.unread_count}
+                      ID: &quot;{count.chatroom_id}&quot; | Name: &quot;{count.chatroom_name}&quot; | Count: {count.unread_count}
                     </p>
                   ))}
                 </div>
@@ -376,7 +376,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                   <p className="font-semibold">Chatroom IDs:</p>
                   {chatrooms.map((room, index) => (
                     <p key={index} className="text-xs">
-                      "{room.id}" - {room.name}
+                      &quot;{room.id}&quot; - {room.name}
                     </p>
                   ))}
                 </div>

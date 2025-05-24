@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
-import { Message, User, MessageReadStatus } from '@/types';
+import { Message, User, ReadInfo } from '@/types';
 import { messageAPI, messageReadStatusAPI } from '@/services/api';
 
 interface MessageActionsProps {
