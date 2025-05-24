@@ -376,9 +376,9 @@ const MessageList: React.FC<MessageListProps> = ({
                 </div>
               </div>
 
-              {/* Message Actions - Positioned as overlay */}
+              {/* Message Actions - Inline with message */}
               {onEditMessage && onDeleteMessage && editingMessageId !== message.id && (
-                <div className={`absolute ${message.sender_id === user?.user_id ? 'left-0 top-0' : 'right-0 top-0'} -mt-2 ${message.sender_id === user?.user_id ? '-ml-8' : '-mr-8'}`}>
+                <div className={`flex items-center mt-2 ${message.sender_id === user?.user_id ? 'justify-end' : 'justify-start'}`}>
                   <MessageActions
                     message={message}
                     user={user}

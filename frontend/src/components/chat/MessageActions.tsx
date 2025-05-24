@@ -51,12 +51,6 @@ const RemoveIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const DotsIcon = ({ className }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-  </svg>
-);
-
 const MessageActions: React.FC<MessageActionsProps> = ({
   message,
   user,
@@ -72,26 +66,7 @@ const MessageActions: React.FC<MessageActionsProps> = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [showDropdown, setShowDropdown] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Handle click outside to close dropdown
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowDropdown(false);
-      }
-    };
-
-    if (showDropdown) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showDropdown]);
 
   // Only show actions for the message sender
   if (!user || message.sender_id !== user.user_id) {
@@ -309,60 +284,29 @@ const MessageActions: React.FC<MessageActionsProps> = ({
 
   return (
     <>
-      <div className="relative" ref={dropdownRef}>
-        {/* Dropdown Trigger Button */}
+      {/* Simple Always-Visible Action Buttons */}
+      <div className="flex items-center space-x-1">
+        {/* Edit Button */}
         <motion.button
-          onClick={() => setShowDropdown(!showDropdown)}
-          className={`p-1 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-all duration-200 ${
-            showDropdown ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-          }`}
+          onClick={handleStartEdit}
+          className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-colors duration-200"
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
-          title="Message options"
+          title="Edit message"
         >
-          <DotsIcon className="w-4 h-4" />
+          <EditIcon className="w-3.5 h-3.5" />
         </motion.button>
 
-        {/* Dropdown Menu */}
-        <AnimatePresence>
-          {showDropdown && (
-            <motion.div
-              className="absolute right-0 top-full mt-1 w-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50"
-              initial={{ opacity: 0, scale: 0.95, y: -10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: -10 }}
-              transition={{ duration: 0.1 }}
-            >
-              <div className="py-1">
-                {/* Edit Option */}
-                <motion.button
-                  onClick={() => {
-                    handleStartEdit();
-                    setShowDropdown(false);
-                  }}
-                  className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
-                  whileHover={{ backgroundColor: 'rgba(0, 0, 0, 0.05)' }}
-                >
-                  <EditIcon className="w-4 h-4 mr-2" />
-                  Edit
-                </motion.button>
-
-                {/* Delete Option */}
-                <motion.button
-                  onClick={() => {
-                    setShowDeleteConfirm(true);
-                    setShowDropdown(false);
-                  }}
-                  className="w-full px-3 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center"
-                  whileHover={{ backgroundColor: 'rgba(239, 68, 68, 0.05)' }}
-                >
-                  <DeleteIcon className="w-4 h-4 mr-2" />
-                  Delete
-                </motion.button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Delete Button */}
+        <motion.button
+          onClick={() => setShowDeleteConfirm(true)}
+          className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors duration-200"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          title="Delete message"
+        >
+          <DeleteIcon className="w-3.5 h-3.5" />
+        </motion.button>
       </div>
 
       {/* Delete Confirmation Modal */}
