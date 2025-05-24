@@ -186,6 +186,8 @@ func (wsc *WebSocketController) HandleConnection(c *gin.Context) {
 	wsc.rooms[roomID][conn] = true
 	wsc.clientsMux.Unlock()
 
+	wsc.logger.Infof("User %d (chat room connection) connected to room %s via token-based WebSocket", uid, roomID)
+
 	// Send connection success message
 	connectMsg := WebSocketMessage{
 		Type: "connected",
@@ -200,19 +202,29 @@ func (wsc *WebSocketController) HandleConnection(c *gin.Context) {
 
 	// Handle client disconnection
 	defer func() {
+		// Recover from any panics during cleanup
+		if r := recover(); r != nil {
+			wsc.logger.Errorf("Panic during WebSocket cleanup for user %d: %v", uid, r)
+		}
+
 		wsc.clientsMux.Lock()
 		// Remove from clients map
-		delete(wsc.clients[uid], conn)
-		if len(wsc.clients[uid]) == 0 {
-			delete(wsc.clients, uid)
+		if connections, ok := wsc.clients[uid]; ok {
+			delete(connections, conn)
+			if len(connections) == 0 {
+				delete(wsc.clients, uid)
+			}
 		}
 		// Remove from room map
-		delete(wsc.rooms[roomID], conn)
-		if len(wsc.rooms[roomID]) == 0 {
-			delete(wsc.rooms, roomID)
+		if clients, ok := wsc.rooms[roomID]; ok {
+			delete(clients, conn)
+			if len(clients) == 0 {
+				delete(wsc.rooms, roomID)
+			}
 		}
 		wsc.clientsMux.Unlock()
 		conn.Close()
+		wsc.logger.Infof("User %d (chat room connection) disconnected from room %s", uid, roomID)
 	}()
 
 	// Start ping-pong to keep connection alive
@@ -314,7 +326,7 @@ func (wsc *WebSocketController) HandleSimpleConnection(c *gin.Context) {
 	wsc.clients[uid][conn] = true
 	wsc.clientsMux.Unlock()
 
-	wsc.logger.Infof("User %d connected via simple WebSocket", uid)
+	wsc.logger.Infof("User %d (sidebar connection) connected via simple WebSocket", uid)
 
 	// Send connection success message
 	connectMsg := WebSocketMessage{
@@ -330,6 +342,11 @@ func (wsc *WebSocketController) HandleSimpleConnection(c *gin.Context) {
 
 	// Handle client disconnection
 	defer func() {
+		// Recover from any panics during cleanup
+		if r := recover(); r != nil {
+			wsc.logger.Errorf("Panic during sidebar WebSocket cleanup for user %d: %v", uid, r)
+		}
+
 		wsc.clientsMux.Lock()
 		// Remove from clients map
 		if connections, ok := wsc.clients[uid]; ok {
@@ -340,7 +357,7 @@ func (wsc *WebSocketController) HandleSimpleConnection(c *gin.Context) {
 		}
 		wsc.clientsMux.Unlock()
 		conn.Close()
-		wsc.logger.Infof("User %d disconnected from simple WebSocket", uid)
+		wsc.logger.Infof("User %d (sidebar connection) disconnected from simple WebSocket", uid)
 	}()
 
 	// Start ping-pong to keep connection alive
@@ -499,10 +516,17 @@ func (wsc *WebSocketController) BroadcastNewMessage(chatroomID string, message a
 	wsc.clientsMux.RLock()
 	for userID, connections := range wsc.clients {
 		for conn := range connections {
-			err := conn.WriteMessage(websocket.TextMessage, jsonMessage)
-			if err != nil {
-				wsc.logger.Errorf("Failed to send new message notification to user %d: %v", userID, err)
-			}
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						wsc.logger.Errorf("Panic while broadcasting new message to user %d: %v", userID, r)
+					}
+				}()
+				err := conn.WriteMessage(websocket.TextMessage, jsonMessage)
+				if err != nil {
+					wsc.logger.Errorf("Failed to send new message notification to user %d: %v", userID, err)
+				}
+			}()
 		}
 	}
 	wsc.clientsMux.RUnlock()
