@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
 import Image from 'next/image';
-import { User, Chatroom, Message } from '@/types';
+import { User, Chatroom, Message, ReadInfo } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { XIcon } from '@heroicons/react/outline';
 import MessageActions from './MessageActions';
@@ -30,7 +30,7 @@ interface MessageListProps {
   onEditMessage?: (messageId: string, newContent: string, newMediaUrl?: string) => void;
   onDeleteMessage?: (messageId: string) => void;
   onNewMessage?: (message: Message) => void;
-  onMessageReadStatusUpdate?: (messageId: string, readStatus: unknown) => void;
+  onMessageReadStatusUpdate?: (messageId: string, readStatus: ReadInfo[]) => void;
   onRefreshMessages?: () => void;
 }
 
@@ -80,7 +80,9 @@ const MessageList: React.FC<MessageListProps> = ({
           if (onMessageReadStatusUpdate && lastMessage.data) {
             const data = lastMessage.data as { message_id?: string; read_status?: unknown };
             if (data.message_id && data.read_status) {
-              onMessageReadStatusUpdate(data.message_id, data.read_status);
+              // Type guard to ensure readStatus is the correct type
+              const typedReadStatus = Array.isArray(data.read_status) ? data.read_status as ReadInfo[] : [];
+              onMessageReadStatusUpdate(data.message_id, typedReadStatus);
             }
           }
           // Refresh messages to get updated read status

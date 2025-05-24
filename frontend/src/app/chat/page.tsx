@@ -7,7 +7,7 @@ import ChatSidebar from '@/components/chat/ChatSidebar';
 import ChatHeader from '@/components/chat/ChatHeader';
 import MessageList from '@/components/chat/MessageList';
 import MessageInput from '@/components/chat/MessageInput';
-import { User, Chatroom, Message, WebSocketMessage } from '@/types';
+import { User, Chatroom, Message, WebSocketMessage, ReadInfo } from '@/types';
 import { chatroomAPI, messageAPI } from '@/services/api';
 import useWebSocket from '@/hooks/useWebSocket';
 import { WebSocketProvider } from '@/contexts/WebSocketContext';
@@ -425,7 +425,7 @@ function ChatPageContent() {
   }, [addMessageSafely]);
 
   // Handle message read status update from WebSocket
-  const handleMessageReadStatusUpdate = useCallback((messageId: string, readStatus: unknown) => {
+  const handleMessageReadStatusUpdate = useCallback((messageId: string, readStatus: ReadInfo[]) => {
     console.log('Updating read status for message:', messageId, readStatus);
     setMessages(prevMessages =>
       prevMessages.map(msg =>
