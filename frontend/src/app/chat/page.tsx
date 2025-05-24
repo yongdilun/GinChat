@@ -10,7 +10,7 @@ import MessageInput from '@/components/chat/MessageInput';
 import { User, Chatroom, Message, WebSocketMessage } from '@/types';
 import { chatroomAPI, messageAPI } from '@/services/api';
 import useWebSocket from '@/hooks/useWebSocket';
-import { WebSocketProvider, useWebSocket as useWebSocketContext } from '@/contexts/WebSocketContext';
+import { WebSocketProvider } from '@/contexts/WebSocketContext';
 
 // Interface for media inside chatrooms
 interface Media {

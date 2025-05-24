@@ -1,8 +1,8 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 
 interface WebSocketMessage {
   type: string;
-  data: any;
+  data: unknown;
   chatroom_id?: string;
 }
 
@@ -40,7 +40,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
   const isBrowser = typeof window !== 'undefined';
 
   // Get user and token from localStorage
-  const getAuthData = () => {
+  const getAuthData = useCallback(() => {
     if (!isBrowser) return { user: null, token: null };
 
     const token = localStorage.getItem('token');
@@ -56,9 +56,9 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     }
 
     return { user, token };
-  };
+  }, [isBrowser]);
 
-  const connect = () => {
+  const connect = useCallback(() => {
     const { user, token } = getAuthData();
 
     if (!user || !token) {
@@ -120,7 +120,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     };
 
     wsRef.current = ws;
-  };
+  }, [getAuthData]);
 
   const disconnect = () => {
     if (reconnectTimeoutRef.current) {
@@ -174,7 +174,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
       clearInterval(authCheckInterval);
       disconnect();
     };
-  }, []); // Empty dependency array since we check auth status inside
+  }, [connect, getAuthData]); // Include dependencies
 
   // Ping to keep connection alive
   useEffect(() => {
@@ -188,7 +188,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     }, 30000); // Ping every 30 seconds
 
     return () => clearInterval(pingInterval);
-  }, [isConnected]);
+  }, [isConnected, sendMessage]);
 
   const value: WebSocketContextType = {
     isConnected,
