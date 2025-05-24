@@ -15,6 +15,7 @@ interface RegisterFormProps {
 
 export default function RegisterForm({ onSuccess }: RegisterFormProps) {
   const router = useRouter();
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -34,7 +35,7 @@ export default function RegisterForm({ onSuccess }: RegisterFormProps) {
     }
 
     try {
-      const response = await authAPI.register(email, email, password);
+      const response = await authAPI.register(username, email, password);
       const { token, user } = response.data;
 
       // Store token and user data only in browser environment
@@ -74,14 +75,30 @@ export default function RegisterForm({ onSuccess }: RegisterFormProps) {
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
-        <div>
+            <div>
+              <label htmlFor="username" className="block text-sm font-medium text-gray-300 mb-1">
+                Username
+              </label>
+              <input
+                id="username"
+                name="username"
+                type="text"
+                autoComplete="username"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="appearance-none block w-full px-3 py-2 border border-gray-600 rounded-md shadow-sm placeholder-gray-400 bg-gray-700 text-white focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                placeholder="Username"
+              />
+            </div>
+            <div>
               <label htmlFor="email-address" className="block text-sm font-medium text-gray-300 mb-1">
                 Email address
-          </label>
-          <input
+              </label>
+              <input
                 id="email-address"
                 name="email"
-            type="email"
+                type="email"
                 autoComplete="email"
                 required
                 value={email}
@@ -89,7 +106,7 @@ export default function RegisterForm({ onSuccess }: RegisterFormProps) {
                 className="appearance-none block w-full px-3 py-2 border border-gray-600 rounded-md shadow-sm placeholder-gray-400 bg-gray-700 text-white focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                 placeholder="Email address"
               />
-        </div>
+            </div>
         <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1">
             Password

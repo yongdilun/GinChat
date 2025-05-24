@@ -28,12 +28,15 @@ backend/
 │   ├── media_controller.go
 │   └── websocket_controller.go
 ├── docs/               # Swagger documentation
+│   ├── docs.go
+│   ├── swagger.json
+│   └── swagger.yaml
 ├── middleware/         # Middleware functions
-│   └── auth_middleware.go
+│   └── auth.go         # Authentication middleware
 ├── models/             # Data models
 │   ├── user.go         # User model (MySQL)
 │   ├── chatroom.go     # Chatroom model (MongoDB)
-│   ├── chatroom_member.go # Chatroom member model
+│   ├── chatroom_member.go # Chatroom member model (MongoDB)
 │   └── message.go      # Message model (MongoDB)
 ├── routes/             # API routes
 │   └── routes.go
@@ -41,17 +44,15 @@ backend/
 │   ├── user_service.go
 │   ├── chatroom_service.go
 │   ├── message_service.go
-│   └── media_service.go
+│   ├── media_service.go
+│   └── cloudinary_service.go  # Cloudinary integration for media storage
 ├── test/               # Test utilities
-│   └── init_db.go      # Database initialization for testing
+│   ├── init_db.go      # Database initialization for testing
+│   └── README.md       # Test documentation
 ├── utils/              # Utility functions
 │   ├── jwt.go          # JWT utilities
-│   └── password.go     # Password hashing utilities
-├── services/           # Business logic
-│   ├── user_service.go
-│   ├── chatroom_service.go
-│   ├── message_service.go
-│   ├── cloudinary_service.go  # Cloudinary integration for media storage
+│   ├── password.go     # Password hashing utilities
+│   └── media_utils.go  # Media type utilities
 ├── .env                # Environment variables
 ├── go.mod              # Go module file
 ├── go.sum              # Go module checksum
@@ -75,29 +76,281 @@ backend/
 
 ## API Endpoints
 
-### Authentication
-- `POST /api/auth/register` - Register a new user
-- `POST /api/auth/login` - Login and get JWT token
-- `POST /api/auth/logout` - Logout (requires authentication)
+All API endpoints are prefixed with `/api` except for health check and Swagger documentation.
 
-### Chatrooms
-- `GET /api/chatrooms` - Get all chatrooms for the authenticated user
-- `POST /api/chatrooms` - Create a new chatroom
-- `POST /api/chatrooms/:id/join` - Join an existing chatroom
+### Authentication (No Auth Required)
 
-### Messages
-- `GET /api/chatrooms/:id/messages` - Get messages for a chatroom
-- `POST /api/chatrooms/:id/messages` - Send a message to a chatroom
+#### Register User
+- **POST** `/api/auth/register`
+- **Description**: Register a new user with username, email, and password
+- **Request Body**:
+  ```json
+  {
+    "username": "string (3-50 chars, required)",
+    "email": "string (valid email, required)",
+    "password": "string (min 6 chars, required)"
+  }
+  ```
+- **Response**: `201 Created`
+  ```json
+  {
+    "user": {
+      "user_id": 1,
+      "username": "john_doe",
+      "email": "john@example.com",
+      "role": "member",
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    "token": "jwt_token_string"
+  }
+  ```
 
-### Media
-- `POST /api/media/upload` - Upload media files
-- `GET /media/:filename` - Serve media files
+#### Login User
+- **POST** `/api/auth/login`
+- **Description**: Login with email and password to get authentication token
+- **Request Body**:
+  ```json
+  {
+    "email": "string (required)",
+    "password": "string (required)"
+  }
+  ```
+- **Response**: `200 OK`
+  ```json
+  {
+    "user": {
+      "user_id": 1,
+      "username": "john_doe",
+      "email": "john@example.com",
+      "role": "member",
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    "token": "jwt_token_string"
+  }
+  ```
 
-### WebSocket
-- `GET /api/ws` - WebSocket endpoint for real-time communication
+### Authentication (Auth Required)
 
-### Health Check
-- `GET /health` - Health check endpoint
+All endpoints below require `Authorization: Bearer <token>` header.
+
+#### Logout User
+- **POST** `/api/auth/logout`
+- **Description**: Logout the authenticated user
+- **Headers**: `Authorization: Bearer <token>`
+- **Response**: `200 OK`
+
+### Chatrooms (Auth Required)
+
+#### Get User's Chatrooms
+- **GET** `/api/chatrooms`
+- **Description**: Get all chatrooms that the authenticated user has joined
+- **Headers**: `Authorization: Bearer <token>`
+- **Response**: `200 OK`
+  ```json
+  {
+    "chatrooms": [
+      {
+        "id": "60d5f8b8e6b5f0b3e8b4b5b3",
+        "name": "General Chat",
+        "created_by": 1,
+        "created_by_name": "john_doe",
+        "created_at": "2024-01-01T00:00:00Z",
+        "member_count": 5
+      }
+    ]
+  }
+  ```
+
+#### Get User's Chatrooms (Alternative)
+- **GET** `/api/chatrooms/user`
+- **Description**: Alternative endpoint to get user's joined chatrooms
+- **Headers**: `Authorization: Bearer <token>`
+- **Response**: Same as above
+
+#### Get Chatroom by ID
+- **GET** `/api/chatrooms/:id`
+- **Description**: Get detailed information about a specific chatroom
+- **Headers**: `Authorization: Bearer <token>`
+- **Parameters**: `id` (string) - Chatroom ObjectID
+- **Response**: `200 OK`
+  ```json
+  {
+    "chatroom": {
+      "id": "60d5f8b8e6b5f0b3e8b4b5b3",
+      "name": "General Chat",
+      "created_by": 1,
+      "created_by_name": "john_doe",
+      "created_at": "2024-01-01T00:00:00Z",
+      "member_count": 5
+    }
+  }
+  ```
+
+#### Create Chatroom
+- **POST** `/api/chatrooms`
+- **Description**: Create a new chatroom (user automatically joins)
+- **Headers**: `Authorization: Bearer <token>`
+- **Request Body**:
+  ```json
+  {
+    "name": "string (3-100 chars, required)"
+  }
+  ```
+- **Response**: `201 Created`
+  ```json
+  {
+    "chatroom": {
+      "id": "60d5f8b8e6b5f0b3e8b4b5b3",
+      "name": "New Chat",
+      "created_by": 1,
+      "created_by_name": "john_doe",
+      "created_at": "2024-01-01T00:00:00Z",
+      "member_count": 1
+    }
+  }
+  ```
+
+#### Join Chatroom
+- **POST** `/api/chatrooms/:id/join`
+- **Description**: Join an existing chatroom
+- **Headers**: `Authorization: Bearer <token>`
+- **Parameters**: `id` (string) - Chatroom ObjectID
+- **Response**: `200 OK`
+  ```json
+  {
+    "message": "Joined chatroom successfully"
+  }
+  ```
+
+### Messages (Auth Required)
+
+#### Get Messages
+- **GET** `/api/chatrooms/:id/messages`
+- **Description**: Get messages from a chatroom (user must be a member)
+- **Headers**: `Authorization: Bearer <token>`
+- **Parameters**:
+  - `id` (string) - Chatroom ObjectID
+  - `limit` (query, optional) - Number of messages to retrieve (default: 50)
+- **Response**: `200 OK`
+  ```json
+  {
+    "messages": [
+      {
+        "id": "60d5f8b8e6b5f0b3e8b4b5b4",
+        "chatroom_id": "60d5f8b8e6b5f0b3e8b4b5b3",
+        "sender_id": 1,
+        "sender_name": "john_doe",
+        "message_type": "text",
+        "text_content": "Hello everyone!",
+        "media_url": "",
+        "sent_at": "2024-01-01T00:00:00Z"
+      }
+    ]
+  }
+  ```
+
+#### Send Message
+- **POST** `/api/chatrooms/:id/messages`
+- **Description**: Send a message to a chatroom (user must be a member)
+- **Headers**: `Authorization: Bearer <token>`
+- **Parameters**: `id` (string) - Chatroom ObjectID
+- **Request Body**:
+  ```json
+  {
+    "message_type": "text|picture|audio|video|text_and_picture|text_and_audio|text_and_video",
+    "text_content": "string (required for text and combined types)",
+    "media_url": "string (required for media and combined types)"
+  }
+  ```
+- **Response**: `201 Created`
+  ```json
+  {
+    "message": {
+      "id": "60d5f8b8e6b5f0b3e8b4b5b4",
+      "chatroom_id": "60d5f8b8e6b5f0b3e8b4b5b3",
+      "sender_id": 1,
+      "sender_name": "john_doe",
+      "message_type": "text",
+      "text_content": "Hello everyone!",
+      "media_url": "",
+      "sent_at": "2024-01-01T00:00:00Z"
+    }
+  }
+  ```
+
+### Media (Auth Required)
+
+#### Upload Media
+- **POST** `/api/media/upload`
+- **Description**: Upload media files (images, audio, video) to Cloudinary
+- **Headers**: `Authorization: Bearer <token>`
+- **Content-Type**: `multipart/form-data`
+- **Form Data**:
+  - `file` (file, required) - Media file to upload
+  - `message_type` (string, required) - One of: `picture`, `audio`, `video`, `text_and_picture`, `text_and_audio`, `text_and_video`
+- **Response**: `201 Created`
+  ```json
+  {
+    "media_url": "https://res.cloudinary.com/your-cloud/image/upload/v123456789/abc123.jpg",
+    "file_name": "abc123.jpg",
+    "message_type": "picture"
+  }
+  ```
+
+### WebSocket (Auth Required)
+
+#### WebSocket Connection
+- **GET** `/api/ws`
+- **Description**: Establish WebSocket connection for real-time messaging
+- **Query Parameters**:
+  - `token` (string, required) - JWT authentication token
+  - `room_id` (string, required) - Chatroom ObjectID to join
+- **Connection URL**: `ws://localhost:8080/api/ws?token=<jwt_token>&room_id=<chatroom_id>`
+- **Connection Response**:
+  ```json
+  {
+    "type": "connected",
+    "data": {
+      "message": "Connected to WebSocket server",
+      "user_id": 1,
+      "room_id": "60d5f8b8e6b5f0b3e8b4b5b3"
+    }
+  }
+  ```
+
+#### WebSocket Message Types
+- **Heartbeat**: Send `{"type": "heartbeat"}` to keep connection alive
+- **Chat Message**: Receive new messages as `{"type": "new_message", "chatroom_id": "...", "data": {...}}`
+
+### Utility Endpoints
+
+#### Health Check
+- **GET** `/health`
+- **Description**: Check if the server is running
+- **Response**: `200 OK`
+  ```json
+  {
+    "status": "ok"
+  }
+  ```
+
+#### WebSocket Debug
+- **GET** `/api/ws-debug`
+- **Description**: Debug endpoint to validate JWT tokens for WebSocket connections
+- **Query Parameters**: `token` (string, required) - JWT token to validate
+- **Response**: `200 OK`
+  ```json
+  {
+    "message": "Token is valid",
+    "user_id": 1,
+    "username": "john_doe"
+  }
+  ```
+
+#### Swagger Documentation
+- **GET** `/swagger/*any`
+- **Description**: Interactive API documentation
+- **URL**: `http://localhost:8080/swagger/index.html`
 
 ## Database Schema
 
@@ -200,21 +453,135 @@ http://localhost:8080/swagger/index.html
 
 ## WebSocket Protocol
 
-The WebSocket endpoint accepts a token parameter for authentication:
+### Connection Requirements
+
+The WebSocket endpoint requires both authentication token and room ID:
 
 ```
-ws://localhost:8080/api/ws?token=your_jwt_token
+ws://localhost:8080/api/ws?token=<jwt_token>&room_id=<chatroom_id>
 ```
 
-WebSocket messages follow this format:
+### Connection Flow
+
+1. **Authentication**: Token is validated on connection
+2. **Room Assignment**: User is automatically joined to the specified chatroom
+3. **Duplicate Prevention**: Any existing connections for the user are closed
+4. **Rate Limiting**: Connection attempts are rate-limited (500ms cooldown)
+
+### Message Format
+
+All WebSocket messages follow this JSON format:
 
 ```json
 {
   "type": "message_type",
-  "chatroom_id": "chatroom_id",
+  "chatroom_id": "optional_chatroom_id",
   "data": {
     // Message-specific data
   }
+}
+```
+
+### Supported Message Types
+
+#### Client to Server:
+- **Heartbeat**: `{"type": "heartbeat"}` - Keep connection alive
+- **Chat Message**: `{"type": "chat_message", "chatroom_id": "...", "data": {...}}` - Send chat message
+
+#### Server to Client:
+- **Connected**: `{"type": "connected", "data": {...}}` - Connection confirmation
+- **Heartbeat ACK**: `{"type": "heartbeat_ack", "data": {...}}` - Heartbeat response
+- **New Message**: `{"type": "new_message", "chatroom_id": "...", "data": {...}}` - Broadcast new messages
+
+### Error Handling
+
+- **401 Unauthorized**: Invalid or missing token
+- **400 Bad Request**: Missing room_id parameter
+- **429 Too Many Requests**: Rate limit exceeded
+
+## Error Response Format
+
+All API errors follow a consistent JSON format:
+
+```json
+{
+  "error": "Error message description"
+}
+```
+
+### Common HTTP Status Codes
+
+- **200 OK**: Request successful
+- **201 Created**: Resource created successfully
+- **400 Bad Request**: Invalid request data or parameters
+- **401 Unauthorized**: Authentication required or invalid token
+- **403 Forbidden**: User lacks permission for the requested resource
+- **404 Not Found**: Resource not found
+- **409 Conflict**: Resource already exists or conflict with current state
+- **429 Too Many Requests**: Rate limit exceeded
+- **500 Internal Server Error**: Server error
+
+### Authentication Errors
+
+- **Missing Authorization Header**: `{"error": "Authorization header is required"}`
+- **Invalid Token Format**: `{"error": "Authorization header must be in the format 'Bearer {token}'"}`
+- **Invalid/Expired Token**: `{"error": "Invalid or expired token"}`
+
+### Validation Errors
+
+- **Missing Required Fields**: `{"error": "Key: 'RegisterRequest.Username' Error:Field validation for 'Username' failed on the 'required' tag"}`
+- **Invalid Email Format**: `{"error": "Key: 'RegisterRequest.Email' Error:Field validation for 'Email' failed on the 'email' tag"}`
+- **Password Too Short**: `{"error": "Key: 'RegisterRequest.Password' Error:Field validation for 'Password' failed on the 'min' tag"}`
+
+### Business Logic Errors
+
+- **User Already Exists**: `{"error": "user with this email or username already exists"}`
+- **Invalid Credentials**: `{"error": "Invalid email or password"}`
+- **Chatroom Not Found**: `{"error": "chatroom not found"}`
+- **User Not Member**: `{"error": "user is not a member of this chatroom"}`
+- **Already Member**: `{"error": "user is already a member of this chatroom"}`
+- **Invalid Message Type**: `{"error": "invalid message type"}`
+
+## Media Message Workflow
+
+To send a message with media (picture, audio, video), follow this two-step process:
+
+### Step 1: Upload Media
+```bash
+curl -X POST http://localhost:8080/api/media/upload \
+  -H "Authorization: Bearer <your_jwt_token>" \
+  -F "file=@/path/to/your/image.jpg" \
+  -F "message_type=picture"
+```
+
+Response:
+```json
+{
+  "media_url": "https://res.cloudinary.com/your-cloud/image/upload/v123456789/abc123.jpg",
+  "file_name": "abc123.jpg",
+  "message_type": "picture"
+}
+```
+
+### Step 2: Send Message with Media URL
+```bash
+curl -X POST http://localhost:8080/api/chatrooms/60d5f8b8e6b5f0b3e8b4b5b3/messages \
+  -H "Authorization: Bearer <your_jwt_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message_type": "picture",
+    "media_url": "https://res.cloudinary.com/your-cloud/image/upload/v123456789/abc123.jpg"
+  }'
+```
+
+### Combined Text and Media Messages
+For combined messages (e.g., `text_and_picture`), include both `text_content` and `media_url`:
+
+```json
+{
+  "message_type": "text_and_picture",
+  "text_content": "Check out this amazing photo!",
+  "media_url": "https://res.cloudinary.com/your-cloud/image/upload/v123456789/abc123.jpg"
 }
 ```
 
@@ -234,7 +601,46 @@ go build -o ginchat-server
 
 ## Security Considerations
 
-- JWT tokens are signed with HS256/RS256 algorithm
-- Passwords are hashed using bcrypt with automatic salting
-- Authentication middleware protects sensitive endpoints
-- Input validation is performed on all API endpoints
+### Authentication & Authorization
+- **JWT Tokens**: Signed with HS256 algorithm using a secret key
+- **Token Validation**: All protected endpoints validate JWT tokens via middleware
+- **Token Expiration**: Configurable token expiration (default: 24h)
+- **Bearer Token Format**: Tokens must be sent as `Authorization: Bearer <token>`
+
+### Password Security
+- **bcrypt Hashing**: Passwords are hashed using bcrypt with automatic salting
+- **No Salt Storage**: Salt is embedded in the bcrypt hash, no separate salt field needed
+- **Password Strength**: Minimum 6 characters required (additional validation can be added)
+- **Timing Attack Prevention**: Login attempts include random delays
+
+### Input Validation
+- **Request Binding**: All endpoints use Gin's ShouldBindJSON for automatic validation
+- **Field Validation**: Required fields, length limits, and format validation
+- **SQL Injection Prevention**: GORM provides automatic SQL injection protection
+- **NoSQL Injection Prevention**: MongoDB driver handles query sanitization
+
+### WebSocket Security
+- **Token Authentication**: WebSocket connections require valid JWT tokens
+- **Room Authorization**: Users can only join chatrooms they're members of
+- **Rate Limiting**: Connection attempts are rate-limited (500ms cooldown)
+- **Connection Management**: Duplicate connections are automatically closed
+
+### CORS Configuration
+- **Cross-Origin Requests**: CORS middleware allows all origins (configure for production)
+- **Allowed Methods**: GET, POST, PUT, DELETE, OPTIONS
+- **Allowed Headers**: Content-Type, Authorization, and other standard headers
+
+### Media Upload Security
+- **Authentication Required**: All media uploads require valid JWT tokens
+- **File Type Validation**: Media type validation based on message type
+- **Cloud Storage**: Files are stored in Cloudinary, not on local server
+- **URL Generation**: Secure URLs generated by Cloudinary service
+
+### Production Security Recommendations
+- **Environment Variables**: Store sensitive data (JWT_SECRET, DB credentials) in environment variables
+- **HTTPS**: Use HTTPS in production for encrypted communication
+- **CORS Restriction**: Restrict CORS origins to your frontend domain(s)
+- **Rate Limiting**: Implement additional rate limiting for API endpoints
+- **Input Sanitization**: Add additional input sanitization for user-generated content
+- **Database Security**: Use strong database passwords and restrict network access
+- **Logging**: Implement comprehensive logging for security monitoring

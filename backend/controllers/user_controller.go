@@ -55,7 +55,7 @@ type LoginRequest struct {
 func (uc *UserController) Register(c *gin.Context) {
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": utils.FormatValidationError(err)})
 		return
 	}
 
@@ -69,9 +69,9 @@ func (uc *UserController) Register(c *gin.Context) {
 	user, err := uc.UserService.Register(req.Username, req.Email, req.Password, "member")
 	if err != nil {
 		if err.Error() == "user with this email or username already exists" {
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			c.JSON(http.StatusConflict, gin.H{"error": utils.FormatServiceError(err)})
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": utils.FormatServiceError(err)})
 		}
 		return
 	}
@@ -79,7 +79,7 @@ func (uc *UserController) Register(c *gin.Context) {
 	// Generate JWT token
 	token, err := utils.GenerateJWT(user.UserID, user.Username, user.Email, user.Role)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Unable to complete registration. Please try again"})
 		return
 	}
 
@@ -108,7 +108,7 @@ func (uc *UserController) Register(c *gin.Context) {
 func (uc *UserController) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": utils.FormatValidationError(err)})
 		return
 	}
 
@@ -117,14 +117,14 @@ func (uc *UserController) Login(c *gin.Context) {
 	if err != nil {
 		// Add a small delay to prevent timing attacks
 		time.Sleep(time.Duration(100+rand.Intn(100)) * time.Millisecond)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": utils.FormatServiceError(err)})
 		return
 	}
 
 	// Generate JWT token
 	token, err := utils.GenerateJWT(user.UserID, user.Username, user.Email, user.Role)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Unable to complete login. Please try again"})
 		return
 	}
 
@@ -152,14 +152,14 @@ func (uc *UserController) Login(c *gin.Context) {
 func (uc *UserController) Logout(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": utils.FormatAuthError(fmt.Errorf("user not authenticated"))})
 		return
 	}
 
 	// Convert userID to uint
 	userIDUint, ok := userID.(uint)
 	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": utils.FormatAuthError(fmt.Errorf("invalid user ID"))})
 		return
 	}
 
@@ -167,9 +167,9 @@ func (uc *UserController) Logout(c *gin.Context) {
 	err := uc.UserService.Logout(userIDUint)
 	if err != nil {
 		if err.Error() == "user not found" {
-			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": utils.FormatServiceError(err)})
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": utils.FormatServiceError(err)})
 		}
 		return
 	}
@@ -185,22 +185,22 @@ func validatePasswordStrength(password string) error {
 
 	// Check for at least one uppercase letter
 	if !regexp.MustCompile(`[A-Z]`).MatchString(password) {
-		return fmt.Errorf("password must contain at least one uppercase letter")
+		return fmt.Errorf("password must include at least one uppercase letter (A-Z)")
 	}
 
 	// Check for at least one lowercase letter
 	if !regexp.MustCompile(`[a-z]`).MatchString(password) {
-		return fmt.Errorf("password must contain at least one lowercase letter")
+		return fmt.Errorf("password must include at least one lowercase letter (a-z)")
 	}
 
 	// Check for at least one digit
 	if !regexp.MustCompile(`[0-9]`).MatchString(password) {
-		return fmt.Errorf("password must contain at least one digit")
+		return fmt.Errorf("password must include at least one number (0-9)")
 	}
 
 	// Check for at least one special character
 	if !regexp.MustCompile(`[^a-zA-Z0-9]`).MatchString(password) {
-		return fmt.Errorf("password must contain at least one special character")
+		return fmt.Errorf("password must include at least one special character")
 	}
 
 	// Check for common passwords
@@ -208,7 +208,7 @@ func validatePasswordStrength(password string) error {
 	passwordLower := strings.ToLower(password)
 	for _, common := range commonPasswords {
 		if strings.Contains(passwordLower, common) {
-			return fmt.Errorf("password contains a common pattern that is easily guessable")
+			return fmt.Errorf("password is too common, please choose a more secure password")
 		}
 	}
 

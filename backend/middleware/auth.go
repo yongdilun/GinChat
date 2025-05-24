@@ -14,7 +14,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		// Get Authorization header
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header is required"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Please log in to continue"})
 			c.Abort()
 			return
 		}
@@ -22,7 +22,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		// Check if the header has the Bearer prefix
 		parts := strings.Split(authHeader, " ")
 		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header must be in the format 'Bearer {token}'"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication failed. Please log in again"})
 			c.Abort()
 			return
 		}
@@ -33,7 +33,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		// Validate token
 		claims, err := utils.ValidateJWT(tokenString)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Your session has expired. Please log in again"})
 			c.Abort()
 			return
 		}

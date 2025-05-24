@@ -52,42 +52,42 @@ type UploadMediaRequest struct {
 func (mc *MediaController) UploadMedia(c *gin.Context) {
 	// Check if Cloudinary service is initialized
 	if mc.CloudinaryService == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Cloudinary service not initialized. Check your environment variables."})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "File upload service is temporarily unavailable. Please try again later"})
 		return
 	}
 
 	// Get user ID from context (set by auth middleware)
 	_, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Please log in to continue"})
 		return
 	}
 
 	// Parse form
 	var req UploadMediaRequest
 	if err := c.ShouldBind(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": utils.FormatValidationError(err)})
 		return
 	}
 
 	// Get the file
 	file, err := c.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No file uploaded"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Please select a file to upload"})
 		return
 	}
 
 	// Determine media type from message type
 	mediaType := utils.GetMediaTypeFromMessageType(req.MessageType)
 	if mediaType == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message type for media upload"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Please select a valid message type"})
 		return
 	}
 
 	// Upload the file to Cloudinary
 	mediaURL, err := mc.CloudinaryService.UploadFile(file, mediaType)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": utils.FormatMediaError(err)})
 		return
 	}
 

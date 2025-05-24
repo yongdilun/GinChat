@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/ginchat/models"
 	"github.com/ginchat/services"
+	"github.com/ginchat/utils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
@@ -54,21 +55,21 @@ type SendMessageRequest struct {
 func (mc *MessageController) SendMessage(c *gin.Context) {
 	var req SendMessageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": utils.FormatValidationError(err)})
 		return
 	}
 
 	// Get chatroom ID from URL
 	chatroomID, err := primitive.ObjectIDFromHex(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chatroom ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Please provide a valid chat room ID"})
 		return
 	}
 
 	// Get user ID from context (set by auth middleware)
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Please log in to continue"})
 		return
 	}
 	username, _ := c.Get("username")
@@ -78,17 +79,17 @@ func (mc *MessageController) SendMessage(c *gin.Context) {
 	if err != nil {
 		switch err.Error() {
 		case "chatroom not found":
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			c.JSON(http.StatusNotFound, gin.H{"error": utils.FormatServiceError(err)})
 		case "user is not a member of this chatroom":
-			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			c.JSON(http.StatusForbidden, gin.H{"error": utils.FormatServiceError(err)})
 		case "text content is required for text messages",
 			"media URL is required for media messages",
 			"text content is required for combined messages",
 			"media URL is required for combined messages",
 			"invalid message type":
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": utils.FormatServiceError(err)})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": utils.FormatServiceError(err)})
 		}
 		return
 	}

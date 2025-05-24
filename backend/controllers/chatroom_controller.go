@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/ginchat/services"
+	"github.com/ginchat/utils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
@@ -45,14 +46,14 @@ type CreateChatroomRequest struct {
 func (cc *ChatroomController) CreateChatroom(c *gin.Context) {
 	var req CreateChatroomRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": utils.FormatValidationError(err)})
 		return
 	}
 
 	// Get user ID from context (set by auth middleware)
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Please log in to continue"})
 		return
 	}
 	username, _ := c.Get("username")
@@ -61,9 +62,9 @@ func (cc *ChatroomController) CreateChatroom(c *gin.Context) {
 	chatroom, err := cc.ChatroomService.CreateChatroom(req.Name, userID.(uint), username.(string))
 	if err != nil {
 		if err.Error() == "chatroom with this name already exists" {
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			c.JSON(http.StatusConflict, gin.H{"error": utils.FormatServiceError(err)})
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": utils.FormatServiceError(err)})
 		}
 		return
 	}
@@ -89,14 +90,14 @@ func (cc *ChatroomController) GetChatrooms(c *gin.Context) {
 	// Get user ID from context (set by auth middleware)
 	_, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Please log in to continue"})
 		return
 	}
 
 	// Get all chatrooms using the service
 	chatrooms, err := cc.ChatroomService.GetChatrooms()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": utils.FormatServiceError(err)})
 		return
 	}
 
