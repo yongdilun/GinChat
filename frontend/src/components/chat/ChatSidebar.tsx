@@ -59,14 +59,11 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
   const [newChatroomPassword, setNewChatroomPassword] = useState('');
   const [roomCode, setRoomCode] = useState('');
   const [roomPassword, setRoomPassword] = useState('');
-  const [foundRoom, setFoundRoom] = useState<Chatroom | null>(null);
   const [showPasswordInput, setShowPasswordInput] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
-  const [joiningChatroomId, setJoiningChatroomId] = useState<string | null>(null);
   const [error, setError] = useState('');
-  const [availableChatrooms, setAvailableChatrooms] = useState<Chatroom[]>([]);
   const [joinedChatrooms, setJoinedChatrooms] = useState<Chatroom[]>([]);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
@@ -78,12 +75,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
       chatroom.members.some(member => member.user_id === user.user_id)
     );
 
-    const available = chatrooms.filter(chatroom =>
-      !chatroom.members.some(member => member.user_id === user.user_id)
-    );
-
     setJoinedChatrooms(joined);
-    setAvailableChatrooms(available);
   }, [chatrooms, user]);
 
   const handleLogout = () => {
@@ -131,37 +123,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
     }
   };
 
-  const joinChatroom = async (chatroomId: string) => {
-    setIsJoining(true);
-    setJoiningChatroomId(chatroomId);
-    setError('');
 
-    try {
-      await chatroomAPI.joinChatroom(chatroomId);
-
-      // Hide forms
-      setShowJoinChatroom(false);
-      setShowChatroomOptions(false);
-
-      // Refresh chatrooms via the parent component
-      await onChatroomsRefresh();
-
-      // Find the joined chatroom in the current chatrooms list or use the response
-      const joinedChatroom = chatrooms.find(chatroom => chatroom.id === chatroomId);
-
-      // Select the joined chatroom
-      if (joinedChatroom) {
-        console.log("Automatically selecting joined chatroom:", joinedChatroom.name);
-        onSelectChatroom(joinedChatroom);
-      }
-    } catch (err: unknown) {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to join chatroom');
-    } finally {
-      setIsJoining(false);
-      setJoiningChatroomId(null);
-    }
-  };
 
   // Search for room by code
   const searchRoomByCode = async (e: React.FormEvent) => {
@@ -171,7 +133,6 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
 
     setIsSearching(true);
     setError('');
-    setFoundRoom(null);
     setShowPasswordInput(false);
 
     try {
