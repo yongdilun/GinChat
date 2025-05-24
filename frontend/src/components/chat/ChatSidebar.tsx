@@ -90,10 +90,13 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
         messageReadStatusAPI.getUnreadCounts(),
       ]);
 
-      setLatestMessages(latestResponse.data);
-      setUnreadCounts(unreadResponse.data);
+      setLatestMessages(latestResponse.data || []);
+      setUnreadCounts(unreadResponse.data || []);
     } catch (error) {
       console.error('Failed to fetch latest messages and unread counts:', error);
+      // Set empty arrays as fallback
+      setLatestMessages([]);
+      setUnreadCounts([]);
     }
   }, [user]);
 
@@ -104,11 +107,13 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
 
   // Helper function to get latest message for a chatroom
   const getLatestMessageForChatroom = (chatroomId: string) => {
+    if (!latestMessages || !Array.isArray(latestMessages)) return null;
     return latestMessages.find(msg => msg.chatroom_id === chatroomId);
   };
 
   // Helper function to get unread count for a chatroom
   const getUnreadCountForChatroom = (chatroomId: string) => {
+    if (!unreadCounts || !Array.isArray(unreadCounts)) return 0;
     const unreadData = unreadCounts.find(count => count.chatroom_id === chatroomId);
     return unreadData?.unread_count || 0;
   };
