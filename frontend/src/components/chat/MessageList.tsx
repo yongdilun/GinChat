@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { XIcon } from '@heroicons/react/outline';
 import MessageActions from './MessageActions';
 import { messageReadStatusAPI } from '@/services/api';
+import { useWebSocket } from '@/contexts/WebSocketContext';
 
 // ArrowDownIcon as inline SVG
 const ArrowDownIcon = ({ className }: { className?: string }) => (
@@ -28,6 +29,9 @@ interface MessageListProps {
   onShowCreateChatroom?: () => void;
   onEditMessage?: (messageId: string, newContent: string, newMediaUrl?: string) => void;
   onDeleteMessage?: (messageId: string) => void;
+  onNewMessage?: (message: Message) => void;
+  onMessageReadStatusUpdate?: (messageId: string, readStatus: any) => void;
+  onRefreshMessages?: () => void;
 }
 
 const MessageList: React.FC<MessageListProps> = ({
@@ -37,12 +41,60 @@ const MessageList: React.FC<MessageListProps> = ({
   onShowJoinChatroom,
   onShowCreateChatroom,
   onEditMessage,
-  onDeleteMessage
+  onDeleteMessage,
+  onNewMessage,
+  onMessageReadStatusUpdate,
+  onRefreshMessages
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [firstUnreadMessageId, setFirstUnreadMessageId] = useState<string | null>(null);
+
+  // WebSocket for real-time updates
+  const { lastMessage } = useWebSocket();
+
+  // Handle WebSocket messages for real-time updates
+  useEffect(() => {
+    if (!lastMessage || !selectedChatroom) return;
+
+    switch (lastMessage.type) {
+      case 'new_message':
+        // Check if the message is for the current chatroom
+        if (lastMessage.chatroom_id === selectedChatroom.id) {
+          console.log('New message received via WebSocket:', lastMessage.data);
+          if (onNewMessage && lastMessage.data) {
+            onNewMessage(lastMessage.data as Message);
+          }
+          // Auto-scroll to bottom for new messages
+          setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+          }, 100);
+        }
+        break;
+
+      case 'message_read':
+        // Check if the read status update is for the current chatroom
+        if (lastMessage.chatroom_id === selectedChatroom.id) {
+          console.log('Message read status update via WebSocket:', lastMessage.data);
+          if (onMessageReadStatusUpdate && lastMessage.data) {
+            const data = lastMessage.data as any;
+            if (data.message_id && data.read_status) {
+              onMessageReadStatusUpdate(data.message_id, data.read_status);
+            }
+          }
+          // Refresh messages to get updated read status
+          if (onRefreshMessages) {
+            onRefreshMessages();
+          }
+        }
+        break;
+
+      default:
+        // Handle other message types if needed
+        break;
+    }
+  }, [lastMessage, selectedChatroom, onNewMessage, onMessageReadStatusUpdate, onRefreshMessages]);
 
   // Get first unread message and auto-scroll to it when chatroom changes
   useEffect(() => {

@@ -418,6 +418,32 @@ function ChatPageContent() {
     }
   }, [selectedChatroom]);
 
+  // Handle new message from WebSocket
+  const handleNewMessage = useCallback((newMessage: Message) => {
+    console.log('Adding new message from WebSocket:', newMessage);
+    addMessageSafely(newMessage);
+  }, []);
+
+  // Handle message read status update from WebSocket
+  const handleMessageReadStatusUpdate = useCallback((messageId: string, readStatus: any) => {
+    console.log('Updating read status for message:', messageId, readStatus);
+    setMessages(prevMessages =>
+      prevMessages.map(msg =>
+        msg.id === messageId ? { ...msg, read_status: readStatus } : msg
+      )
+    );
+  }, []);
+
+  // Handle refresh messages from WebSocket
+  const handleRefreshMessages = useCallback(() => {
+    if (selectedChatroom) {
+      console.log('Refreshing messages due to WebSocket update');
+      // Reset fetch flag and fetch messages again
+      fetchMessagesRef.current[selectedChatroom.id] = false;
+      fetchMessages(selectedChatroom.id);
+    }
+  }, [selectedChatroom]);
+
   // Helper functions to handle creating/joining chatrooms from the welcome page
   const handleShowCreateChatroom = useCallback(() => {
     // Find sidebar and check if it's collapsed
@@ -538,6 +564,9 @@ function ChatPageContent() {
                   onShowCreateChatroom={handleShowCreateChatroom}
                   onEditMessage={handleEditMessage}
                   onDeleteMessage={handleDeleteMessage}
+                  onNewMessage={handleNewMessage}
+                  onMessageReadStatusUpdate={handleMessageReadStatusUpdate}
+                  onRefreshMessages={handleRefreshMessages}
             />
           </div>
 

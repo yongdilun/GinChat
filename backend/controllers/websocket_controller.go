@@ -454,8 +454,22 @@ func (wsc *WebSocketController) BroadcastNewMessage(chatroomID string, message a
 		return
 	}
 
-	// Send to broadcast channel
+	// Send to broadcast channel for room-specific broadcasting
 	wsc.broadcast <- jsonMessage
+
+	// Also send to all connected users for sidebar updates
+	wsc.clientsMux.RLock()
+	for userID, connections := range wsc.clients {
+		for conn := range connections {
+			err := conn.WriteMessage(websocket.TextMessage, jsonMessage)
+			if err != nil {
+				wsc.logger.Errorf("Failed to send new message notification to user %d: %v", userID, err)
+			}
+		}
+	}
+	wsc.clientsMux.RUnlock()
+
+	wsc.logger.Infof("Broadcasted new message to chatroom %s", chatroomID)
 }
 
 // BroadcastNewMessageGlobal is a helper function to broadcast a message using the global controller
@@ -485,8 +499,22 @@ func (wsc *WebSocketController) BroadcastMessageRead(chatroomID string, readData
 		return
 	}
 
-	// Send to broadcast channel
+	// Send to broadcast channel for room-specific broadcasting
 	wsc.broadcast <- jsonMessage
+
+	// Also send to all connected users for real-time read status updates
+	wsc.clientsMux.RLock()
+	for userID, connections := range wsc.clients {
+		for conn := range connections {
+			err := conn.WriteMessage(websocket.TextMessage, jsonMessage)
+			if err != nil {
+				wsc.logger.Errorf("Failed to send read status update to user %d: %v", userID, err)
+			}
+		}
+	}
+	wsc.clientsMux.RUnlock()
+
+	wsc.logger.Infof("Broadcasted message read status to chatroom %s", chatroomID)
 }
 
 // BroadcastMessageReadGlobal is a helper function to broadcast message read status using the global controller
