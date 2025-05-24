@@ -103,8 +103,16 @@ func (mc *MessageController) SendMessage(c *gin.Context) {
 		return
 	}
 
-	// Broadcast the new message to all connected clients
+	// Broadcast the new message to all connected clients with read status
 	messageResponse := message.ToResponse()
+
+	// Get read status for the new message
+	if mc.MessageService.ReadStatusSvc != nil {
+		readStatus, err := mc.MessageService.ReadStatusSvc.GetMessageReadStatus(message.ID)
+		if err == nil {
+			messageResponse.ReadStatus = readStatus
+		}
+	}
 
 	// Check if GlobalWebSocketController is available
 	if GlobalWebSocketController != nil {

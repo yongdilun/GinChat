@@ -370,11 +370,31 @@ func (c *MessageReadStatusController) MarkAllMessagesInChatroomAsRead(ctx *gin.C
 		return
 	}
 
+	// Get all unread messages before marking them as read
+	unreadMessages, err := c.ReadStatusService.GetUnreadMessagesInChatroom(chatroomID, userID.(uint))
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": utils.FormatServiceError(err)})
+		return
+	}
+
 	// Mark all messages as read
 	err = c.ReadStatusService.MarkAllMessagesInChatroomAsRead(chatroomID, userID.(uint))
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": utils.FormatServiceError(err)})
 		return
+	}
+
+	// Send WebSocket notifications for each message that was marked as read
+	for _, message := range unreadMessages {
+		readStatus, err := c.ReadStatusService.GetMessageReadStatus(message.ID)
+		if err == nil {
+			// Broadcast read status update for this specific message
+			BroadcastMessageReadGlobal(chatroomID.Hex(), map[string]any{
+				"message_id":  message.ID.Hex(),
+				"read_status": readStatus,
+				"user_id":     userID.(uint),
+			})
+		}
 	}
 
 	// Send WebSocket notification about unread count updates

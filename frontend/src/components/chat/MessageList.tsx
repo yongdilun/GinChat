@@ -507,10 +507,10 @@ const MessageList: React.FC<MessageListProps> = ({
                       {new Date(message.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
                     {/* Blue tick for read status - only show for sender's messages */}
-                    {message.sender_id === user?.user_id && message.read_status && (
+                    {message.sender_id === user?.user_id && (
                       <div className="flex items-center">
-                        {/* Check if all recipients have read the message */}
-                        {message.read_status.every(status => status.is_read) ? (
+                        {/* Check if read status exists and all recipients have read the message */}
+                        {message.read_status && message.read_status.length > 0 && message.read_status.every(status => status.is_read) ? (
                           // All read - blue double tick
                           <div className="flex items-center text-blue-500" title="Read by all">
                             <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -520,7 +520,7 @@ const MessageList: React.FC<MessageListProps> = ({
                               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                             </svg>
                           </div>
-                        ) : message.read_status.some(status => status.is_read) ? (
+                        ) : message.read_status && message.read_status.length > 0 && message.read_status.some(status => status.is_read) ? (
                           // Some read - gray double tick
                           <div className="flex items-center text-gray-400" title="Read by some">
                             <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -531,7 +531,7 @@ const MessageList: React.FC<MessageListProps> = ({
                             </svg>
                           </div>
                         ) : (
-                          // None read - single gray tick
+                          // None read or no read status - single gray tick (delivered)
                           <div className="flex items-center text-gray-400" title="Delivered">
                             <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />

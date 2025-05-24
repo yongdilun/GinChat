@@ -441,3 +441,48 @@ func (s *MessageReadStatusService) GetUnreadCountForChatroom(chatroomID primitiv
 
 	return count, nil
 }
+
+// GetUnreadMessagesInChatroom gets all unread messages for a user in a chatroom
+func (s *MessageReadStatusService) GetUnreadMessagesInChatroom(chatroomID primitive.ObjectID, userID uint) ([]models.Message, error) {
+	// Find all unread message IDs for this user in this chatroom
+	cursor, err := s.ReadStatusColl.Find(context.Background(), bson.M{
+		"chatroom_id":  chatroomID,
+		"recipient_id": userID,
+		"is_read":      false,
+	})
+	if err != nil {
+		return nil, errors.New("failed to get unread message statuses")
+	}
+	defer cursor.Close(context.Background())
+
+	var readStatuses []models.MessageReadStatus
+	if err := cursor.All(context.Background(), &readStatuses); err != nil {
+		return nil, errors.New("failed to decode unread message statuses")
+	}
+
+	// Extract message IDs
+	var messageIDs []primitive.ObjectID
+	for _, status := range readStatuses {
+		messageIDs = append(messageIDs, status.MessageID)
+	}
+
+	if len(messageIDs) == 0 {
+		return []models.Message{}, nil // No unread messages
+	}
+
+	// Get the actual messages
+	messageCursor, err := s.MessageColl.Find(context.Background(), bson.M{
+		"_id": bson.M{"$in": messageIDs},
+	})
+	if err != nil {
+		return nil, errors.New("failed to get unread messages")
+	}
+	defer messageCursor.Close(context.Background())
+
+	var messages []models.Message
+	if err := messageCursor.All(context.Background(), &messages); err != nil {
+		return nil, errors.New("failed to decode unread messages")
+	}
+
+	return messages, nil
+}
