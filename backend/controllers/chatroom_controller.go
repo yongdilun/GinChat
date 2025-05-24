@@ -20,8 +20,9 @@ type ChatroomController struct {
 // NewChatroomController creates a new ChatroomController
 func NewChatroomController(db *gorm.DB, mongodb *mongo.Database) *ChatroomController {
 	chatroomService := services.NewChatroomService(mongodb)
+	userService := services.NewUserService(db)
 	cloudinaryService, _ := services.NewCloudinaryService() // Ignore error for now, will be nil if not configured
-	readStatusService := services.NewMessageReadStatusService(mongodb, chatroomService)
+	readStatusService := services.NewMessageReadStatusService(mongodb, chatroomService, userService)
 	messageService := services.NewMessageService(mongodb, chatroomService, cloudinaryService, readStatusService)
 	return &ChatroomController{
 		ChatroomService: chatroomService,

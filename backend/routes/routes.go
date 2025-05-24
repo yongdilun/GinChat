@@ -75,7 +75,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, mongodb *mongo.Database, logger *lo
 
 			// Message read status routes
 			messageReadStatusController := controllers.NewMessageReadStatusController(
-				services.NewMessageReadStatusService(mongodb, services.NewChatroomService(mongodb)),
+				services.NewMessageReadStatusService(mongodb, services.NewChatroomService(mongodb), services.NewUserService(db)),
 			)
 			protected.POST("/messages/read", messageReadStatusController.MarkMessageAsRead)
 			protected.POST("/messages/read-multiple", messageReadStatusController.MarkMultipleMessagesAsRead)

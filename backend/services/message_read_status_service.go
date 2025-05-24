@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/ginchat/models"
@@ -20,10 +21,11 @@ type MessageReadStatusService struct {
 	MessageColl      *mongo.Collection
 	ChatroomColl     *mongo.Collection
 	ChatroomService  *ChatroomService
+	UserService      *UserService
 }
 
 // NewMessageReadStatusService creates a new MessageReadStatusService
-func NewMessageReadStatusService(mongodb *mongo.Database, chatroomService *ChatroomService) *MessageReadStatusService {
+func NewMessageReadStatusService(mongodb *mongo.Database, chatroomService *ChatroomService, userService *UserService) *MessageReadStatusService {
 	return &MessageReadStatusService{
 		MongoDB:          mongodb,
 		ReadStatusColl:   mongodb.Collection("message_read_status"),
@@ -31,6 +33,7 @@ func NewMessageReadStatusService(mongodb *mongo.Database, chatroomService *Chatr
 		MessageColl:      mongodb.Collection("messages"),
 		ChatroomColl:     mongodb.Collection("chatrooms"),
 		ChatroomService:  chatroomService,
+		UserService:      userService,
 	}
 }
 
@@ -43,7 +46,7 @@ func (s *MessageReadStatusService) CreateReadStatusForMessage(messageID primitiv
 	}
 
 	// Create read status for each member except the sender
-	var readStatuses []interface{}
+	var readStatuses []any
 	now := time.Now()
 
 	for _, member := range chatroom.Members {
@@ -162,15 +165,22 @@ func (s *MessageReadStatusService) GetMessageReadStatus(messageID primitive.Obje
 		return nil, errors.New("failed to decode read statuses")
 	}
 
-	// Convert to ReadInfo format
+	// Convert to ReadInfo format with usernames
 	var readInfos []models.ReadInfo
 	for _, status := range readStatuses {
-		// Get username for the recipient
-		// Note: You might want to cache usernames or join with user collection
+		// Get username from user service
+		username := fmt.Sprintf("User %d", status.RecipientID) // Default fallback
+		if s.UserService != nil {
+			if user, err := s.UserService.GetUserByID(status.RecipientID); err == nil {
+				username = user.Username
+			}
+		}
+
 		readInfo := models.ReadInfo{
-			UserID: status.RecipientID,
-			IsRead: status.IsRead,
-			ReadAt: status.ReadAt,
+			UserID:   status.RecipientID,
+			Username: username,
+			IsRead:   status.IsRead,
+			ReadAt:   status.ReadAt,
 		}
 		readInfos = append(readInfos, readInfo)
 	}
@@ -198,49 +208,41 @@ func (s *MessageReadStatusService) GetUserLastReadForChatroom(chatroomID primiti
 
 // GetUnreadCountForUser gets unread message count for all chatrooms for a user
 func (s *MessageReadStatusService) GetUnreadCountForUser(userID uint) ([]models.ChatroomUnreadCount, error) {
-	// Aggregate pipeline to count unread messages per chatroom
-	pipeline := []bson.M{
-		{
-			"$match": bson.M{
-				"recipient_id": userID,
-				"is_read":      false,
-			},
-		},
-		{
-			"$group": bson.M{
-				"_id":   "$chatroom_id",
-				"count": bson.M{"$sum": 1},
-			},
-		},
-		{
-			"$lookup": bson.M{
-				"from":         "chatrooms",
-				"localField":   "_id",
-				"foreignField": "_id",
-				"as":           "chatroom",
-			},
-		},
-		{
-			"$unwind": "$chatroom",
-		},
-		{
-			"$project": bson.M{
-				"chatroom_id":   bson.M{"$toString": "$_id"},
-				"chatroom_name": "$chatroom.name",
-				"unread_count":  "$count",
-			},
-		},
-	}
-
-	cursor, err := s.ReadStatusColl.Aggregate(context.Background(), pipeline)
+	// First, let's get all chatrooms the user is a member of
+	chatroomCursor, err := s.ChatroomColl.Find(context.Background(), bson.M{
+		"members.user_id": userID,
+	})
 	if err != nil {
-		return nil, errors.New("failed to get unread counts")
+		return nil, errors.New("failed to get user chatrooms")
 	}
-	defer cursor.Close(context.Background())
+	defer chatroomCursor.Close(context.Background())
+
+	var userChatrooms []models.Chatroom
+	if err := chatroomCursor.All(context.Background(), &userChatrooms); err != nil {
+		return nil, errors.New("failed to decode user chatrooms")
+	}
 
 	var unreadCounts []models.ChatroomUnreadCount
-	if err := cursor.All(context.Background(), &unreadCounts); err != nil {
-		return nil, errors.New("failed to decode unread counts")
+
+	// For each chatroom, count unread messages
+	for _, chatroom := range userChatrooms {
+		count, err := s.ReadStatusColl.CountDocuments(context.Background(), bson.M{
+			"chatroom_id":  chatroom.ID,
+			"recipient_id": userID,
+			"is_read":      false,
+		})
+		if err != nil {
+			// Log error but continue with other chatrooms
+			continue
+		}
+
+		// Add to results even if count is 0 (for debugging)
+		unreadCount := models.ChatroomUnreadCount{
+			ChatroomID:   chatroom.ID.Hex(),
+			ChatroomName: chatroom.Name,
+			UnreadCount:  count,
+		}
+		unreadCounts = append(unreadCounts, unreadCount)
 	}
 
 	return unreadCounts, nil

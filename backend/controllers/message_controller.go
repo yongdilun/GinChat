@@ -21,8 +21,9 @@ type MessageController struct {
 // NewMessageController creates a new MessageController
 func NewMessageController(db *gorm.DB, mongodb *mongo.Database) *MessageController {
 	chatroomService := services.NewChatroomService(mongodb)
+	userService := services.NewUserService(db)
 	cloudinaryService, _ := services.NewCloudinaryService() // Ignore error for now, will be nil if not configured
-	readStatusService := services.NewMessageReadStatusService(mongodb, chatroomService)
+	readStatusService := services.NewMessageReadStatusService(mongodb, chatroomService, userService)
 	messageService := services.NewMessageService(mongodb, chatroomService, cloudinaryService, readStatusService)
 	return &MessageController{
 		MessageService: messageService,
