@@ -142,13 +142,13 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     reconnectAttempts.current = 0;
   };
 
-  const sendMessage = (message: WebSocketMessage) => {
+  const sendMessage = useCallback((message: WebSocketMessage) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(message));
     } else {
       console.warn('WebSocket is not connected. Cannot send message:', message);
     }
-  };
+  }, []);
 
   // Connect when component mounts and check auth status
   useEffect(() => {

@@ -62,13 +62,28 @@ backend/
 ## Key Features
 
 - **RESTful API**: Clean API design following REST principles
-- **Real-time Messaging**: WebSocket support for instant messaging
+- **Real-time Messaging**: Advanced WebSocket support for instant messaging
+  - **Instant Message Delivery**: Messages appear immediately across all connected clients
+  - **Live Message Broadcasting**: Real-time message distribution to chatroom members
+  - **Auto-reconnection**: Robust connection management with exponential backoff
+  - **Connection Status Tracking**: Real-time connection monitoring and status updates
 - **Message Read Status**: Complete blue tick system with read/unread tracking
-  - Individual message read status tracking
-  - Unread message counts per chatroom
-  - Latest message tracking for chatroom overview
-  - Auto-mark messages as read functionality
-  - First unread message navigation
+  - **Grey/Blue Tick Indicators**: Visual read status like WhatsApp/Telegram
+    - Single grey tick: Message delivered (not read)
+    - Double grey tick: Message read by some recipients
+    - Double blue tick: Message read by ALL recipients
+  - **Real-time Read Status Updates**: Read status changes instantly via WebSocket
+  - **Individual message read status tracking**: Per-user read status for each message
+  - **Unread message counts per chatroom**: Live unread count updates
+  - **Latest message tracking for chatroom overview**: Real-time sidebar updates
+  - **Auto-mark messages as read functionality**: Automatic read marking when viewing
+  - **First unread message navigation**: Smart scroll to unread content
+- **WebSocket Real-time Features**:
+  - **Live Sidebar Updates**: Unread counts update instantly without refresh
+  - **Real-time Message Appearance**: New messages appear immediately in chat
+  - **Live Read Receipt Updates**: Blue ticks update in real-time when messages are read
+  - **Connection Management**: Automatic reconnection with status indicators
+  - **Broadcast System**: Efficient message distribution to all connected users
 - **Authentication**: Secure JWT-based authentication
 - **Password Security**: bcrypt hashing with automatic salting
 - **Chatroom Management**: Room codes, passwords, and member management
@@ -554,28 +569,102 @@ All endpoints below require `Authorization: Bearer <token>` header.
 
 ### WebSocket (Auth Required)
 
-#### WebSocket Connection
+#### WebSocket Connection Options
+
+##### Option 1: Room-specific Connection (Chat Room WebSocket)
 - **GET** `/api/ws`
-- **Description**: Establish WebSocket connection for real-time messaging
+- **Description**: Establish WebSocket connection for specific chatroom real-time messaging
 - **Query Parameters**:
   - `token` (string, required) - JWT authentication token
   - `room_id` (string, required) - Chatroom ObjectID to join
 - **Connection URL**: `ws://localhost:8080/api/ws?token=<jwt_token>&room_id=<chatroom_id>`
-- **Connection Response**:
-  ```json
-  {
-    "type": "connected",
-    "data": {
-      "message": "Connected to WebSocket server",
-      "user_id": 1,
-      "room_id": "60d5f8b8e6b5f0b3e8b4b5b3"
-    }
+- **Use Case**: Real-time messaging within a specific chatroom
+
+##### Option 2: User-based Connection (Sidebar WebSocket)
+- **GET** `/ws`
+- **Description**: Establish WebSocket connection for user-wide real-time updates
+- **Query Parameters**:
+  - `user_id` (string, required) - User ID for connection
+- **Connection URL**: `ws://localhost:8080/ws?user_id=<user_id>`
+- **Use Case**: Real-time sidebar updates, unread counts, and cross-chatroom notifications
+
+#### WebSocket Connection Response
+```json
+{
+  "type": "connected",
+  "data": {
+    "message": "Connected to WebSocket server",
+    "user_id": 1,
+    "type": "sidebar|chatroom",
+    "room_id": "60d5f8b8e6b5f0b3e8b4b5b3" // Only for room-specific connections
   }
-  ```
+}
+```
 
 #### WebSocket Message Types
-- **Heartbeat**: Send `{"type": "heartbeat"}` to keep connection alive
-- **Chat Message**: Receive new messages as `{"type": "new_message", "chatroom_id": "...", "data": {...}}`
+
+##### Client to Server Messages:
+- **Ping**: `{"type": "ping", "data": {"timestamp": "2025-01-24T20:00:00Z"}}` - Keep connection alive
+- **Heartbeat**: `{"type": "heartbeat"}` - Alternative keep-alive mechanism
+
+##### Server to Client Messages:
+
+###### Real-time Message Updates:
+```json
+{
+  "type": "new_message",
+  "chatroom_id": "60d5f8b8e6b5f0b3e8b4b5b3",
+  "data": {
+    "id": "message_id",
+    "chatroom_id": "60d5f8b8e6b5f0b3e8b4b5b3",
+    "sender_id": 1,
+    "sender_name": "john_doe",
+    "message_type": "text",
+    "text_content": "Hello everyone!",
+    "media_url": "",
+    "sent_at": "2025-01-24T20:00:00Z",
+    "read_status": [...]
+  }
+}
+```
+
+###### Real-time Read Status Updates:
+```json
+{
+  "type": "message_read",
+  "chatroom_id": "60d5f8b8e6b5f0b3e8b4b5b3",
+  "data": {
+    "message_id": "message_id",
+    "read_status": [
+      {"user_id": 1, "is_read": true, "read_at": "2025-01-24T20:00:00Z"},
+      {"user_id": 2, "is_read": false}
+    ],
+    "user_id": 1
+  }
+}
+```
+
+###### Real-time Unread Count Updates:
+```json
+{
+  "type": "unread_count_update",
+  "data": [
+    {
+      "chatroom_id": "60d5f8b8e6b5f0b3e8b4b5b3",
+      "unread_count": 3
+    },
+    {
+      "chatroom_id": "60d5f8b8e6b5f0b3e8b4b5b4",
+      "unread_count": 0
+    }
+  ]
+}
+```
+
+###### Connection Management:
+- **Connected**: `{"type": "connected", "data": {...}}` - Connection confirmation
+- **Pong**: `{"type": "pong", "data": {"timestamp": "..."}}` - Ping response
+- **Heartbeat ACK**: `{"type": "heartbeat_ack", "data": {"timestamp": "..."}}` - Heartbeat response
 
 ### Utility Endpoints
 
@@ -747,16 +836,17 @@ curl -X PUT http://localhost:8080/api/chatrooms/60d5f8b8e6b5f0b3e8b4b5b3/message
   }'
 ```
 
-#### 5. WebSocket Connection
+#### 5. WebSocket Connection Examples
 
+##### Real-time Chat Room Connection
 ```javascript
-// JavaScript WebSocket example
+// JavaScript WebSocket example for chatroom-specific real-time messaging
 const token = "your_jwt_token_here";
 const roomId = "60d5f8b8e6b5f0b3e8b4b5b3";
 const ws = new WebSocket(`ws://localhost:8080/api/ws?token=${token}&room_id=${roomId}`);
 
 ws.onopen = function(event) {
-    console.log("Connected to WebSocket");
+    console.log("Connected to chatroom WebSocket");
 
     // Send heartbeat to keep connection alive
     setInterval(() => {
@@ -774,7 +864,13 @@ ws.onmessage = function(event) {
             break;
         case "new_message":
             console.log("New message in room:", message.chatroom_id, message.data);
-            // Update your UI with the new message
+            // Update your chat UI with the new message
+            displayNewMessage(message.data);
+            break;
+        case "message_read":
+            console.log("Message read status update:", message.data);
+            // Update read status indicators (grey/blue ticks)
+            updateReadStatus(message.data.message_id, message.data.read_status);
             break;
         case "heartbeat_ack":
             console.log("Heartbeat acknowledged");
@@ -789,6 +885,124 @@ ws.onerror = function(error) {
 ws.onclose = function(event) {
     console.log("WebSocket connection closed:", event.code, event.reason);
 };
+```
+
+##### Real-time Sidebar Updates Connection
+```javascript
+// JavaScript WebSocket example for sidebar real-time updates
+const userId = "123"; // Get from localStorage or user context
+const sidebarWs = new WebSocket(`ws://localhost:8080/ws?user_id=${userId}`);
+
+sidebarWs.onopen = function(event) {
+    console.log("Connected to sidebar WebSocket");
+
+    // Send ping to keep connection alive
+    setInterval(() => {
+        sidebarWs.send(JSON.stringify({
+            type: "ping",
+            data: { timestamp: new Date().toISOString() }
+        }));
+    }, 30000); // Every 30 seconds
+};
+
+sidebarWs.onmessage = function(event) {
+    const message = JSON.parse(event.data);
+    console.log("Sidebar update received:", message);
+
+    switch(message.type) {
+        case "connected":
+            console.log("Successfully connected to sidebar updates");
+            break;
+        case "new_message":
+            console.log("New message notification:", message.data);
+            // Update sidebar with new message indicator
+            updateSidebarNewMessage(message.chatroom_id, message.data);
+            break;
+        case "unread_count_update":
+            console.log("Unread counts updated:", message.data);
+            // Update unread count badges in sidebar
+            updateUnreadCounts(message.data);
+            break;
+        case "message_read":
+            console.log("Read status update:", message.data);
+            // Update read status if currently viewing the chatroom
+            if (currentChatroomId === message.chatroom_id) {
+                updateReadStatus(message.data.message_id, message.data.read_status);
+            }
+            break;
+        case "pong":
+            console.log("Ping acknowledged");
+            break;
+    }
+};
+
+sidebarWs.onerror = function(error) {
+    console.error("Sidebar WebSocket error:", error);
+};
+
+sidebarWs.onclose = function(event) {
+    console.log("Sidebar WebSocket connection closed:", event.code, event.reason);
+    // Attempt to reconnect after a delay
+    setTimeout(() => {
+        console.log("Attempting to reconnect sidebar WebSocket...");
+        // Recreate connection
+    }, 5000);
+};
+
+// Helper functions for UI updates
+function displayNewMessage(messageData) {
+    // Add new message to chat UI
+    const messageElement = createMessageElement(messageData);
+    document.getElementById('messages-container').appendChild(messageElement);
+    scrollToBottom();
+}
+
+function updateReadStatus(messageId, readStatus) {
+    // Update grey/blue tick indicators
+    const messageElement = document.getElementById(`message-${messageId}`);
+    if (messageElement) {
+        const tickElement = messageElement.querySelector('.read-status-tick');
+        if (readStatus.every(status => status.is_read)) {
+            // All read - blue double tick
+            tickElement.className = 'read-status-tick blue-tick';
+            tickElement.title = 'Read by all';
+        } else if (readStatus.some(status => status.is_read)) {
+            // Some read - grey double tick
+            tickElement.className = 'read-status-tick grey-double-tick';
+            tickElement.title = 'Read by some';
+        } else {
+            // None read - single grey tick
+            tickElement.className = 'read-status-tick grey-single-tick';
+            tickElement.title = 'Delivered';
+        }
+    }
+}
+
+function updateUnreadCounts(unreadData) {
+    // Update sidebar unread count badges
+    unreadData.forEach(item => {
+        const badgeElement = document.getElementById(`unread-badge-${item.chatroom_id}`);
+        if (badgeElement) {
+            if (item.unread_count > 0) {
+                badgeElement.textContent = item.unread_count;
+                badgeElement.style.display = 'block';
+            } else {
+                badgeElement.style.display = 'none';
+            }
+        }
+    });
+}
+
+function updateSidebarNewMessage(chatroomId, messageData) {
+    // Update latest message preview in sidebar
+    const chatroomElement = document.getElementById(`chatroom-${chatroomId}`);
+    if (chatroomElement) {
+        const latestMessageElement = chatroomElement.querySelector('.latest-message');
+        if (latestMessageElement) {
+            latestMessageElement.textContent = messageData.text_content || '[Media]';
+        }
+    }
+}
 ```
 
 ### Error Handling Examples

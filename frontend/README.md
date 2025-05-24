@@ -57,14 +57,29 @@ frontend/
 - **Modern React with Next.js App Router**: Utilizing the latest Next.js features for efficient routing and server components
 - **Type-Safe Development**: Full TypeScript integration for better developer experience and code quality
 - **Responsive UI with Tailwind CSS**: Fully responsive design using utility-first CSS framework
-- **Real-time Communication**: WebSocket integration for instant messaging
-- **Message Read Status System**: Complete blue tick implementation
-  - Unread message count indicators in sidebar
-  - Latest message preview for each chatroom
-  - Auto-navigation to first unread message
-  - Auto-mark messages as read when entering chatroom
-  - Info button to view detailed read status
-  - "Unread messages" label for navigation
+- **Real-time Communication**: Advanced WebSocket integration for instant messaging
+  - **Instant Message Delivery**: Messages appear immediately across all connected clients
+  - **Live Message Broadcasting**: Real-time message distribution without page refresh
+  - **Auto-reconnection**: Robust connection management with exponential backoff
+  - **Connection Status Indicators**: Visual WebSocket connection status (green/red dots)
+- **Message Read Status System**: Complete WhatsApp-like blue tick implementation
+  - **Grey/Blue Tick Indicators**: Visual read status like WhatsApp/Telegram
+    - Single grey tick: Message delivered (not read)
+    - Double grey tick: Message read by some recipients
+    - Double blue tick: Message read by ALL recipients
+  - **Real-time Read Status Updates**: Read status changes instantly via WebSocket
+  - **Unread message count indicators in sidebar**: Live unread count updates
+  - **Latest message preview for each chatroom**: Real-time sidebar updates
+  - **Auto-navigation to first unread message**: Smart scroll to unread content
+  - **Auto-mark messages as read when entering chatroom**: Automatic read marking
+  - **Info button to view detailed read status**: Per-user read status details
+  - **"Unread messages" label for navigation**: Clear unread message indication
+- **WebSocket Real-time Features**:
+  - **Live Sidebar Updates**: Unread counts and latest messages update instantly
+  - **Real-time Message Appearance**: New messages appear immediately in chat
+  - **Live Read Receipt Updates**: Blue ticks update in real-time when messages are read
+  - **Connection Management**: Automatic reconnection with status indicators
+  - **Dual WebSocket System**: Separate connections for chat and sidebar updates
 - **Authentication**: JWT-based authentication with secure token handling
 - **Chatroom Management**: Room codes, passwords, and member management
 - **Media Support**: Upload and share images, audio, and video files
@@ -79,6 +94,70 @@ The frontend communicates with the backend through:
 
 1. **REST API**: For authentication, fetching data, and performing actions
 2. **WebSockets**: For real-time messaging and notifications
+
+### WebSocket Integration
+
+The application uses a dual WebSocket system for optimal real-time performance:
+
+#### 1. Sidebar WebSocket Connection
+- **Purpose**: Real-time sidebar updates (unread counts, latest messages)
+- **Connection**: `ws://your-domain/ws?user_id=123`
+- **Features**:
+  - Live unread count updates
+  - Real-time latest message previews
+  - Connection status monitoring
+  - Auto-reconnection with exponential backoff
+
+#### 2. Chat Room WebSocket Connection (Future Enhancement)
+- **Purpose**: Room-specific real-time messaging
+- **Connection**: `ws://your-domain/api/ws?token=jwt&room_id=room123`
+- **Features**:
+  - Instant message delivery
+  - Real-time read status updates
+  - Typing indicators (planned)
+
+#### WebSocket Context Provider
+```typescript
+// WebSocket context provides:
+interface WebSocketContextType {
+  isConnected: boolean;
+  sendMessage: (message: WebSocketMessage) => void;
+  lastMessage: WebSocketMessage | null;
+  connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'error';
+}
+
+// Usage in components:
+const { isConnected, lastMessage, connectionStatus } = useWebSocket();
+```
+
+#### Real-time Message Handling
+```typescript
+// MessageList handles real-time updates:
+useEffect(() => {
+  if (!lastMessage || !selectedChatroom) return;
+
+  switch (lastMessage.type) {
+    case 'new_message':
+      if (lastMessage.chatroom_id === selectedChatroom.id) {
+        onNewMessage(lastMessage.data as Message);
+        // Auto-scroll to new message
+      }
+      break;
+
+    case 'message_read':
+      if (lastMessage.chatroom_id === selectedChatroom.id) {
+        onMessageReadStatusUpdate(data.message_id, data.read_status);
+        onRefreshMessages(); // Refresh to get updated read status
+      }
+      break;
+
+    case 'unread_count_update':
+      // Update sidebar unread counts immediately
+      updateUnreadCounts(lastMessage.data);
+      break;
+  }
+}, [lastMessage, selectedChatroom]);
+```
 
 API routes are proxied through Next.js to avoid CORS issues:
 
@@ -118,16 +197,32 @@ The application supports various message types:
 
 ## Message Read Status Features
 
+### Real-time WebSocket Updates
+- **Live Unread Count Updates**: Sidebar badges update instantly when messages are sent/read
+- **Real-time Read Status Changes**: Grey/blue ticks update immediately via WebSocket
+- **Instant Message Appearance**: New messages appear immediately without refresh
+- **Connection Status Monitoring**: Visual indicators show WebSocket connection status
+
+### Grey/Blue Tick System (WhatsApp-like)
+- **Single Grey Tick (✓)**: Message delivered but not read by anyone
+- **Double Grey Tick (✓✓)**: Message read by some recipients
+- **Double Blue Tick (✓✓)**: Message read by ALL recipients
+- **Real-time Updates**: Tick status changes instantly when users read messages
+- **Tooltips**: Hover over ticks to see status descriptions
+
 ### Sidebar Enhancements
-- **Unread Count Badges**: Red circular badges showing unread message count for each chatroom
+- **Live Unread Count Badges**: Red circular badges with real-time updates via WebSocket
 - **Latest Message Preview**: Shows the most recent message with smart truncation and media type icons
+- **Real-time Latest Messages**: Updates immediately when new messages arrive
 - **Responsive Design**: Adapts to both expanded and collapsed sidebar states
-- **Real-time Updates**: Automatically refreshes when new messages arrive
+- **Connection Status Indicator**: Green/red dot showing WebSocket connection status
 
 ### Message List Features
 - **Auto-Navigation**: Automatically scrolls to the first unread message when entering a chatroom
 - **Unread Messages Label**: Blue floating label appears above the oldest unread message for easy identification
 - **Auto-Mark as Read**: Messages are automatically marked as read after 2 seconds in the chatroom
+- **Real-time Message Appearance**: New messages appear instantly via WebSocket
+- **Live Read Status Updates**: Read status changes immediately when other users read messages
 - **Clean Visual Design**: No highlighting or rings, just the unread label for clear indication
 
 ### Message Actions
@@ -135,12 +230,15 @@ The application supports various message types:
 - **Read Status Modal**: Shows detailed information about who has read each message
 - **Permission-Based Actions**: Edit and delete buttons only appear for message senders
 - **Real-time Data**: Read status information is fetched live from the backend
+- **Live Updates**: Read status modal updates in real-time via WebSocket
 
 ### UI/UX Improvements
 - **Animated Badges**: Unread count badges have subtle pulse animation
 - **Smart Truncation**: Long messages are truncated with "..." for better layout
 - **Media Type Icons**: Different icons for photos (📷), audio (🎵), and video (🎥)
 - **Loading States**: Proper loading indicators while fetching read status data
+- **Connection Indicators**: Visual feedback for WebSocket connection status
+- **Smooth Animations**: Framer Motion animations for better user experience
 
 ## Getting Started
 

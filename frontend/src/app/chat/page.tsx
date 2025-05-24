@@ -422,10 +422,10 @@ function ChatPageContent() {
   const handleNewMessage = useCallback((newMessage: Message) => {
     console.log('Adding new message from WebSocket:', newMessage);
     addMessageSafely(newMessage);
-  }, []);
+  }, [addMessageSafely]);
 
   // Handle message read status update from WebSocket
-  const handleMessageReadStatusUpdate = useCallback((messageId: string, readStatus: any) => {
+  const handleMessageReadStatusUpdate = useCallback((messageId: string, readStatus: unknown) => {
     console.log('Updating read status for message:', messageId, readStatus);
     setMessages(prevMessages =>
       prevMessages.map(msg =>

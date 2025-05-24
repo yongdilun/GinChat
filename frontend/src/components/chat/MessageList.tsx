@@ -30,7 +30,7 @@ interface MessageListProps {
   onEditMessage?: (messageId: string, newContent: string, newMediaUrl?: string) => void;
   onDeleteMessage?: (messageId: string) => void;
   onNewMessage?: (message: Message) => void;
-  onMessageReadStatusUpdate?: (messageId: string, readStatus: any) => void;
+  onMessageReadStatusUpdate?: (messageId: string, readStatus: unknown) => void;
   onRefreshMessages?: () => void;
 }
 
@@ -78,7 +78,7 @@ const MessageList: React.FC<MessageListProps> = ({
         if (lastMessage.chatroom_id === selectedChatroom.id) {
           console.log('Message read status update via WebSocket:', lastMessage.data);
           if (onMessageReadStatusUpdate && lastMessage.data) {
-            const data = lastMessage.data as any;
+            const data = lastMessage.data as { message_id?: string; read_status?: unknown };
             if (data.message_id && data.read_status) {
               onMessageReadStatusUpdate(data.message_id, data.read_status);
             }
