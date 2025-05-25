@@ -50,8 +50,6 @@ const MessageList: React.FC<MessageListProps> = ({
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [firstUnreadMessageId, setFirstUnreadMessageId] = useState<string | null>(null);
-  const [hasNavigatedToUnread, setHasNavigatedToUnread] = useState(false);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   // WebSocket for real-time updates
   const { lastMessage } = useWebSocket();
@@ -69,10 +67,12 @@ const MessageList: React.FC<MessageListProps> = ({
             const newMessage = lastMessage.data as Message;
             onNewMessage(newMessage);
           }
-          // Auto-scroll to bottom for new messages (direct navigation)
+          // FIXED: Direct positioning to bottom for new messages
           setTimeout(() => {
-            if (messagesEndRef.current) {
-              messagesEndRef.current.scrollIntoView({ behavior: 'instant', block: 'end' });
+            const messagesContainer = document.querySelector('.h-full.overflow-y-auto');
+            if (messagesContainer) {
+              messagesContainer.scrollTop = messagesContainer.scrollHeight;
+              console.log('🎯 Auto-positioned to bottom for new message');
             }
           }, 50);
         }
@@ -122,47 +122,53 @@ const MessageList: React.FC<MessageListProps> = ({
         if (firstUnreadMessage) {
           // Set unread message ID (FIXED: This will be static until chat room change)
           setFirstUnreadMessageId(firstUnreadMessage.id);
-          setHasNavigatedToUnread(true);
           console.log('📍 Found first unread message:', firstUnreadMessage.id);
 
-          // Wait for messages to load, then navigate directly to unread message
+          // FIXED: Direct positioning to unread message without scrolling animation
           setTimeout(() => {
             const messageElement = document.getElementById(`message-${firstUnreadMessage.id}`);
-            if (messageElement) {
-              // FIXED: Direct navigation instead of smooth scroll from top
-              messageElement.scrollIntoView({ behavior: 'instant', block: 'center' });
-              console.log('🎯 Navigated directly to unread message');
+            const messagesContainer = document.querySelector('.h-full.overflow-y-auto');
+
+            if (messageElement && messagesContainer) {
+              // Calculate direct position
+              const containerRect = messagesContainer.getBoundingClientRect();
+              const messageRect = messageElement.getBoundingClientRect();
+              const scrollTop = messagesContainer.scrollTop;
+              const targetPosition = scrollTop + messageRect.top - containerRect.top - (containerRect.height / 2) + (messageRect.height / 2);
+
+              // Direct positioning without animation
+              messagesContainer.scrollTop = Math.max(0, targetPosition);
+              console.log('🎯 Positioned directly at unread message');
             }
-          }, 300); // Reduced delay for faster navigation
+          }, 200); // Faster positioning
         } else {
           setFirstUnreadMessageId(null);
-          setHasNavigatedToUnread(false);
           console.log('📍 No unread messages, navigating to bottom');
 
-          // No unread messages, navigate directly to bottom
+          // FIXED: Direct positioning to bottom without scrolling animation
           setTimeout(() => {
-            if (messagesEndRef.current) {
-              messagesEndRef.current.scrollIntoView({ behavior: 'instant', block: 'end' });
+            const messagesContainer = document.querySelector('.h-full.overflow-y-auto');
+            if (messagesContainer) {
+              // Direct positioning to bottom
+              messagesContainer.scrollTop = messagesContainer.scrollHeight;
+              console.log('🎯 Positioned directly at bottom');
             }
           }, 200);
         }
       } catch (error) {
         console.error('Failed to get first unread message:', error);
         setFirstUnreadMessageId(null);
-        setHasNavigatedToUnread(false);
 
-        // Fallback to navigating to bottom
+        // FIXED: Fallback direct positioning to bottom
         setTimeout(() => {
-          if (messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({ behavior: 'instant', block: 'end' });
+          const messagesContainer = document.querySelector('.h-full.overflow-y-auto');
+          if (messagesContainer) {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            console.log('🎯 Fallback positioned at bottom');
           }
         }, 200);
       }
     };
-
-    // Reset navigation state when chatroom changes
-    setIsInitialLoad(true);
-    setHasNavigatedToUnread(false);
 
     // Only run when chatroom changes, not when messages change
     getFirstUnreadAndNavigate();
@@ -210,7 +216,6 @@ const MessageList: React.FC<MessageListProps> = ({
         // FIXED: Only clear unread label after explicit mark-all-read action
         console.log('🔄 Marked all messages as read, clearing unread label');
         setFirstUnreadMessageId(null);
-        setHasNavigatedToUnread(false);
       } catch (error) {
         console.error('Failed to mark messages as read:', error);
       }
@@ -228,8 +233,6 @@ const MessageList: React.FC<MessageListProps> = ({
   useEffect(() => {
     console.log('🔄 Chatroom changed, resetting unread label state');
     setFirstUnreadMessageId(null);
-    setHasNavigatedToUnread(false);
-    setIsInitialLoad(true);
   }, [selectedChatroom?.id]);
 
   // Monitor messages changes for debugging
@@ -475,8 +478,8 @@ const MessageList: React.FC<MessageListProps> = ({
         >
           {messages.map((message, index) => (
             <div key={message.id}>
-              {/* Unread Messages Label - Show above the first unread message */}
-              {firstUnreadMessageId === message.id && (
+              {/* Unread Messages Label - FIXED: Only show on recipient's messages, not sender's */}
+              {firstUnreadMessageId === message.id && message.sender_id !== user?.user_id && (
                 <motion.div
                   className="flex justify-center mb-4"
                   initial={{ opacity: 0, y: -20 }}

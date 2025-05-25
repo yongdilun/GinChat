@@ -595,16 +595,15 @@ function ChatPageContent() {
               if (sentMessage) {
                 addMessageSafely(sentMessage);
 
-                // FIXED: Navigate directly to bottom when user sends message
+                // FIXED: Direct positioning to bottom when user sends message
                 setTimeout(() => {
                   const messagesContainer = document.querySelector('.h-full.overflow-y-auto');
                   if (messagesContainer) {
-                    messagesContainer.scrollTo({
-                      top: messagesContainer.scrollHeight,
-                      behavior: 'instant'
-                    });
+                    // Direct positioning without any animation
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                    console.log('🎯 User sent message - positioned directly at bottom');
                   }
-                }, 100);
+                }, 50); // Faster response
               }
             }}
           />
