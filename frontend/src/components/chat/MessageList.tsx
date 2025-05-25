@@ -50,6 +50,8 @@ const MessageList: React.FC<MessageListProps> = ({
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [firstUnreadMessageId, setFirstUnreadMessageId] = useState<string | null>(null);
+  const [hasNavigatedToUnread, setHasNavigatedToUnread] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   // WebSocket for real-time updates
   const { lastMessage } = useWebSocket();
@@ -67,10 +69,12 @@ const MessageList: React.FC<MessageListProps> = ({
             const newMessage = lastMessage.data as Message;
             onNewMessage(newMessage);
           }
-          // Auto-scroll to bottom for new messages
+          // Auto-scroll to bottom for new messages (direct navigation)
           setTimeout(() => {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-          }, 100);
+            if (messagesEndRef.current) {
+              messagesEndRef.current.scrollIntoView({ behavior: 'instant', block: 'end' });
+            }
+          }, 50);
         }
         break;
 
@@ -105,44 +109,63 @@ const MessageList: React.FC<MessageListProps> = ({
     }
   }, [lastMessage, selectedChatroom, onNewMessage, onMessageReadStatusUpdate, onRefreshMessages, user]);
 
-  // Get first unread message and auto-scroll to it when chatroom changes (but not when messages change)
+  // Get first unread message and navigate directly when chatroom changes (FIXED: Static unread label)
   useEffect(() => {
     if (!selectedChatroom || !user) return;
 
-    const getFirstUnreadAndScroll = async () => {
+    const getFirstUnreadAndNavigate = async () => {
       try {
+        console.log('🎯 Getting first unread message for chatroom:', selectedChatroom.id);
         const response = await messageReadStatusAPI.getFirstUnreadMessage(selectedChatroom.id);
         const firstUnreadMessage = response.data;
 
         if (firstUnreadMessage) {
+          // Set unread message ID (FIXED: This will be static until chat room change)
           setFirstUnreadMessageId(firstUnreadMessage.id);
+          setHasNavigatedToUnread(true);
+          console.log('📍 Found first unread message:', firstUnreadMessage.id);
 
-          // Wait for messages to load, then scroll to first unread message
+          // Wait for messages to load, then navigate directly to unread message
           setTimeout(() => {
             const messageElement = document.getElementById(`message-${firstUnreadMessage.id}`);
             if (messageElement) {
-              messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              // FIXED: Direct navigation instead of smooth scroll from top
+              messageElement.scrollIntoView({ behavior: 'instant', block: 'center' });
+              console.log('🎯 Navigated directly to unread message');
             }
-          }, 500);
+          }, 300); // Reduced delay for faster navigation
         } else {
           setFirstUnreadMessageId(null);
-          // No unread messages, scroll to bottom
+          setHasNavigatedToUnread(false);
+          console.log('📍 No unread messages, navigating to bottom');
+
+          // No unread messages, navigate directly to bottom
           setTimeout(() => {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-          }, 300);
+            if (messagesEndRef.current) {
+              messagesEndRef.current.scrollIntoView({ behavior: 'instant', block: 'end' });
+            }
+          }, 200);
         }
       } catch (error) {
         console.error('Failed to get first unread message:', error);
         setFirstUnreadMessageId(null);
-        // Fallback to scrolling to bottom
+        setHasNavigatedToUnread(false);
+
+        // Fallback to navigating to bottom
         setTimeout(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }, 300);
+          if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: 'instant', block: 'end' });
+          }
+        }, 200);
       }
     };
 
+    // Reset navigation state when chatroom changes
+    setIsInitialLoad(true);
+    setHasNavigatedToUnread(false);
+
     // Only run when chatroom changes, not when messages change
-    getFirstUnreadAndScroll();
+    getFirstUnreadAndNavigate();
   }, [selectedChatroom?.id, user?.user_id]); // Removed messages dependency
 
   // Manual mark message as read when clicked (for testing real-time updates)
@@ -177,17 +200,17 @@ const MessageList: React.FC<MessageListProps> = ({
     }
   };
 
-  // Auto-mark all messages as read when entering chatroom (disabled for testing)
+  // Auto-mark all messages as read when entering chatroom (FIXED: Only clear label on manual action)
   useEffect(() => {
     if (!selectedChatroom || !user) return;
 
     const markAllAsRead = async () => {
       try {
         await messageReadStatusAPI.markAllMessagesAsRead(selectedChatroom.id);
-        // Clear the unread message label after marking as read
-        setTimeout(() => {
-          setFirstUnreadMessageId(null);
-        }, 1000);
+        // FIXED: Only clear unread label after explicit mark-all-read action
+        console.log('🔄 Marked all messages as read, clearing unread label');
+        setFirstUnreadMessageId(null);
+        setHasNavigatedToUnread(false);
       } catch (error) {
         console.error('Failed to mark messages as read:', error);
       }
@@ -199,11 +222,14 @@ const MessageList: React.FC<MessageListProps> = ({
     }, 10000); // Increased to 10 seconds for testing
 
     return () => clearTimeout(timer);
-  }, [selectedChatroom, user, onRefreshMessages]);
+  }, [selectedChatroom, user]);
 
-  // Reset first unread message when chatroom changes
+  // Reset first unread message when chatroom changes (FIXED: Only on chatroom change)
   useEffect(() => {
+    console.log('🔄 Chatroom changed, resetting unread label state');
     setFirstUnreadMessageId(null);
+    setHasNavigatedToUnread(false);
+    setIsInitialLoad(true);
   }, [selectedChatroom?.id]);
 
   // Monitor messages changes for debugging

@@ -594,6 +594,17 @@ function ChatPageContent() {
               // our safe add function that prevents duplication
               if (sentMessage) {
                 addMessageSafely(sentMessage);
+
+                // FIXED: Navigate directly to bottom when user sends message
+                setTimeout(() => {
+                  const messagesContainer = document.querySelector('.h-full.overflow-y-auto');
+                  if (messagesContainer) {
+                    messagesContainer.scrollTo({
+                      top: messagesContainer.scrollHeight,
+                      behavior: 'instant'
+                    });
+                  }
+                }, 100);
               }
             }}
           />
