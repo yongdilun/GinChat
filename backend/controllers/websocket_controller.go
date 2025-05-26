@@ -98,7 +98,7 @@ var upgrader = websocket.Upgrader{
 
 // Rate limiting constants
 const (
-	connectionCooldown = 2 * time.Second // Increased to 2 seconds to reduce conflicts
+	connectionCooldown = 500 * time.Millisecond // Reduced to 500ms for mobile-friendly reconnections
 )
 
 // HandleConnection handles a WebSocket connection
@@ -533,7 +533,7 @@ func (wsc *WebSocketController) BroadcastUnreadCountUpdate(userID uint, unreadDa
 		return
 	}
 
-	// Send directly to user's connections
+	// Send directly to user's connections (all rooms including sidebar)
 	wsc.clientsMux.RLock()
 	if connections, ok := wsc.clients[userID]; ok {
 		wsc.logger.Infof("Broadcasting unread count update to user %d (%d connections)", userID, len(connections))
@@ -545,6 +545,25 @@ func (wsc *WebSocketController) BroadcastUnreadCountUpdate(userID uint, unreadDa
 		}
 	} else {
 		wsc.logger.Warnf("No WebSocket connections found for user %d", userID)
+	}
+
+	// Also broadcast to global sidebar room for mobile apps
+	if clients, ok := wsc.rooms["global_sidebar"]; ok {
+		wsc.logger.Infof("Broadcasting unread count update to global_sidebar room (%d connections)", len(clients))
+		for conn := range clients {
+			// Check if this connection belongs to the target user
+			for connUserID, userConnections := range wsc.clients {
+				if connUserID == userID {
+					if _, hasConn := userConnections[conn]; hasConn {
+						err := conn.WriteMessage(websocket.TextMessage, jsonMessage)
+						if err != nil {
+							wsc.logger.Errorf("Failed to send unread count update to sidebar for user %d: %v", userID, err)
+						}
+						break
+					}
+				}
+			}
+		}
 	}
 	wsc.clientsMux.RUnlock()
 }
