@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ginchat/services"
@@ -372,8 +373,11 @@ func (c *MessageReadStatusController) MarkAllMessagesInChatroomAsRead(ctx *gin.C
 	// Return success immediately for better performance
 	ctx.JSON(http.StatusOK, gin.H{"message": "All messages marked as read successfully"})
 
-	// Handle WebSocket notifications asynchronously (non-blocking)
+	// Handle WebSocket notifications asynchronously (non-blocking) with debounce
 	go func() {
+		// Add a small delay to prevent rapid-fire WebSocket events
+		time.Sleep(100 * time.Millisecond)
+
 		// Send a single bulk read status update instead of individual messages
 		BroadcastMessageReadGlobal(chatroomID.Hex(), map[string]any{
 			"type":        "bulk_read",

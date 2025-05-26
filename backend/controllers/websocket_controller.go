@@ -387,18 +387,18 @@ func (wsc *WebSocketController) BroadcastMessageRead(chatroomID string, readData
 		return
 	}
 
-	// Send to broadcast channel for room-specific broadcasting
-	wsc.broadcast <- jsonMessage
-
-	// Send read status updates only to chatroom members (more efficient)
+	// Send read status updates only to chatroom members (avoid double broadcasting)
 	wsc.clientsMux.RLock()
 	if clients, ok := wsc.rooms[chatroomID]; ok {
+		wsc.logger.Infof("Broadcasting message read status to chatroom %s (%d connections)", chatroomID, len(clients))
 		for conn := range clients {
 			err := conn.WriteMessage(websocket.TextMessage, jsonMessage)
 			if err != nil {
 				wsc.logger.Errorf("Failed to send read status update to chatroom %s: %v", chatroomID, err)
 			}
 		}
+	} else {
+		wsc.logger.Warnf("No connections found for chatroom %s", chatroomID)
 	}
 	wsc.clientsMux.RUnlock()
 }
