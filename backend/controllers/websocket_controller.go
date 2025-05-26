@@ -98,7 +98,7 @@ var upgrader = websocket.Upgrader{
 
 // Rate limiting constants
 const (
-	connectionCooldown = 500 * time.Millisecond // Reduced to 500ms for mobile-friendly reconnections
+	connectionCooldown = 100 * time.Millisecond // Further reduced to 100ms for mobile apps
 )
 
 // HandleConnection handles a WebSocket connection

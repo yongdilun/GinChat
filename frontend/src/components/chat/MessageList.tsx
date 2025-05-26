@@ -250,7 +250,7 @@ const MessageList: React.FC<MessageListProps> = ({
     });
   }, [messages, user?.user_id]);
 
-  // Periodic refresh of read status for sender's messages (like working read status modal approach)
+  // Reduced periodic refresh of read status for sender's messages (only when needed)
   useEffect(() => {
     if (!user || !selectedChatroom || messages.length === 0) return;
 
@@ -261,22 +261,26 @@ const MessageList: React.FC<MessageListProps> = ({
         !msg.read_status.every(status => status.is_read) // Only refresh unread messages
       );
 
-      if (senderMessages.length > 0) {
+      // Only refresh if there are unread sender messages and not too many
+      if (senderMessages.length > 0 && senderMessages.length <= 5) {
         console.log(`🔄 Refreshing read status for ${senderMessages.length} sender messages`);
 
-        // Refresh read status for each sender message
-        for (const msg of senderMessages) {
-          try {
-            await refreshMessageReadStatus(msg.id);
-          } catch (error) {
-            console.error(`Failed to refresh read status for message ${msg.id}:`, error);
-          }
+        // Refresh read status for each sender message with delay to avoid spam
+        for (let i = 0; i < senderMessages.length; i++) {
+          const msg = senderMessages[i];
+          setTimeout(async () => {
+            try {
+              await refreshMessageReadStatus(msg.id);
+            } catch (error) {
+              console.error(`Failed to refresh read status for message ${msg.id}:`, error);
+            }
+          }, i * 200); // 200ms delay between each request
         }
       }
     };
 
-    // Refresh every 5 seconds for testing (can be increased for production)
-    const interval = setInterval(refreshSenderMessages, 5000);
+    // Refresh every 15 seconds to reduce API load (was 5 seconds)
+    const interval = setInterval(refreshSenderMessages, 15000);
 
     return () => clearInterval(interval);
   }, [messages, user, selectedChatroom, refreshMessageReadStatus]);
