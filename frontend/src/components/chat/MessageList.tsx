@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import Image from 'next/image';
 import { User, Chatroom, Message, ReadInfo } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -79,23 +79,22 @@ const MessageList: React.FC<MessageListProps> = ({
         break;
 
       case 'message_read':
-        // Handle real-time read status updates with API verification
+        // Handle real-time read status updates (optimized - no API refresh)
         if (lastMessage.chatroom_id === selectedChatroom.id) {
           if (lastMessage.data) {
-            const data = lastMessage.data as { message_id?: string; read_status?: ReadInfo[] };
-            if (data.message_id) {
-              console.log(`📡 WebSocket read status update for message ${data.message_id}`);
+            const data = lastMessage.data as { message_id?: string; read_status?: ReadInfo[]; user_id?: number };
+            if (data.message_id && data.read_status) {
+              // Only update if this is not the current user (to avoid duplicate updates)
+              if (data.user_id !== user?.user_id) {
+                console.log(`📡 WebSocket read status update for message ${data.message_id}`);
 
-              // Use WebSocket data if available
-              if (data.read_status && onMessageReadStatusUpdate) {
-                onMessageReadStatusUpdate(data.message_id, data.read_status);
-                console.log(`✅ Updated from WebSocket:`, data.read_status);
+                if (onMessageReadStatusUpdate) {
+                  onMessageReadStatusUpdate(data.message_id, data.read_status);
+                  console.log(`✅ Updated from WebSocket:`, data.read_status);
+                }
+              } else {
+                console.log(`⏭️ Skipping WebSocket update for current user (already updated optimistically)`);
               }
-
-              // Also refresh from API to ensure accuracy (like working read status modal)
-              setTimeout(() => {
-                refreshMessageReadStatus(data.message_id!);
-              }, 100); // Small delay to avoid race conditions
             }
           }
         }
@@ -174,60 +173,111 @@ const MessageList: React.FC<MessageListProps> = ({
     getFirstUnreadAndNavigate();
   }, [selectedChatroom, user]); // Include full objects for proper dependency tracking
 
-  // Manual mark message as read when clicked (for testing real-time updates)
+  // Manual mark message as read when clicked (optimized with instant UI update)
   const handleMessageClick = async (messageId: string) => {
     if (!user || !selectedChatroom) return;
 
+    console.log('🚀 Optimistic mark message as read:', messageId);
+
+    // OPTIMISTIC UPDATE: Update UI immediately for instant feedback
+    if (onMessageReadStatusUpdate) {
+      // Find current message to get existing read status
+      const currentMessage = messages.find(msg => msg.id === messageId);
+      if (currentMessage) {
+        const updatedReadStatus = [...(currentMessage.read_status || [])];
+        const userReadIndex = updatedReadStatus.findIndex(status => status.user_id === user.user_id);
+
+        if (userReadIndex >= 0) {
+          // Update existing read status
+          updatedReadStatus[userReadIndex] = {
+            ...updatedReadStatus[userReadIndex],
+            is_read: true,
+            read_at: new Date().toISOString()
+          };
+        } else {
+          // Add new read status
+          updatedReadStatus.push({
+            user_id: user.user_id,
+            username: user.username,
+            is_read: true,
+            read_at: new Date().toISOString()
+          });
+        }
+
+        // Update UI immediately
+        onMessageReadStatusUpdate(messageId, updatedReadStatus);
+      }
+    }
+
+    // API call in background (non-blocking)
     try {
       await messageReadStatusAPI.markMessageAsRead(messageId);
-      console.log('Manually marked message as read:', messageId);
-
-      // Immediately refresh the read status for this message (like working read status modal)
-      await refreshMessageReadStatus(messageId);
+      console.log('✅ Confirmed mark message as read:', messageId);
     } catch (error) {
-      console.error('Failed to mark message as read:', error);
+      console.error('❌ Failed to mark message as read:', error);
+      // TODO: Could implement rollback here if needed
     }
   };
 
-  // Refresh read status for a specific message (using same approach as working read status modal)
-  const refreshMessageReadStatus = useCallback(async (messageId: string) => {
-    try {
-      console.log('🔄 Refreshing read status for message:', messageId);
-      const response = await messageReadStatusAPI.getMessageReadStatus(messageId);
-      const freshReadStatus = response.data;
+  // Removed refreshMessageReadStatus - now using optimistic updates only
 
-      // Update the message with fresh read status data
-      if (onMessageReadStatusUpdate) {
-        onMessageReadStatusUpdate(messageId, freshReadStatus);
-        console.log('✅ Refreshed read status from API:', freshReadStatus);
-      }
-    } catch (error) {
-      console.error('Failed to refresh read status:', error);
-    }
-  }, [onMessageReadStatusUpdate]);
-
-  // Auto-mark all messages as read when entering chatroom (FIXED: Only clear label on manual action)
+  // Auto-mark all messages as read when entering chatroom (optimized with instant UI update)
   useEffect(() => {
     if (!selectedChatroom || !user) return;
 
     const markAllAsRead = async () => {
+      console.log('🚀 Optimistic mark all messages as read for chatroom:', selectedChatroom.id);
+
+      // OPTIMISTIC UPDATE: Update UI immediately for all messages from others
+      if (onMessageReadStatusUpdate) {
+        messages.forEach(message => {
+          // Only update messages not sent by current user
+          if (message.sender_id !== user.user_id) {
+            const updatedReadStatus = [...(message.read_status || [])];
+            const userReadIndex = updatedReadStatus.findIndex(status => status.user_id === user.user_id);
+
+            if (userReadIndex >= 0) {
+              // Update existing read status
+              updatedReadStatus[userReadIndex] = {
+                ...updatedReadStatus[userReadIndex],
+                is_read: true,
+                read_at: new Date().toISOString()
+              };
+            } else {
+              // Add new read status
+              updatedReadStatus.push({
+                user_id: user.user_id,
+                username: user.username,
+                is_read: true,
+                read_at: new Date().toISOString()
+              });
+            }
+
+            // Update UI immediately
+            onMessageReadStatusUpdate(message.id, updatedReadStatus);
+          }
+        });
+      }
+
+      // Clear unread label immediately
+      setFirstUnreadMessageId(null);
+
+      // API call in background (non-blocking)
       try {
         await messageReadStatusAPI.markAllMessagesAsRead(selectedChatroom.id);
-        // FIXED: Only clear unread label after explicit mark-all-read action
-        console.log('🔄 Marked all messages as read, clearing unread label');
-        setFirstUnreadMessageId(null);
+        console.log('✅ Confirmed mark all messages as read');
       } catch (error) {
-        console.error('Failed to mark messages as read:', error);
+        console.error('❌ Failed to mark messages as read:', error);
       }
     };
 
-    // Mark as read after a longer delay to allow testing of real-time updates
+    // Reduced delay for faster user experience
     const timer = setTimeout(() => {
       markAllAsRead();
-    }, 10000); // Increased to 10 seconds for testing
+    }, 1000); // Reduced to 1 second for better UX
 
     return () => clearTimeout(timer);
-  }, [selectedChatroom, user]);
+  }, [selectedChatroom, user, messages, onMessageReadStatusUpdate]);
 
   // Reset first unread message when chatroom changes (FIXED: Only on chatroom change)
   useEffect(() => {
@@ -250,40 +300,7 @@ const MessageList: React.FC<MessageListProps> = ({
     });
   }, [messages, user?.user_id]);
 
-  // Reduced periodic refresh of read status for sender's messages (only when needed)
-  useEffect(() => {
-    if (!user || !selectedChatroom || messages.length === 0) return;
-
-    const refreshSenderMessages = async () => {
-      const senderMessages = messages.filter(msg =>
-        msg.sender_id === user.user_id &&
-        msg.read_status &&
-        !msg.read_status.every(status => status.is_read) // Only refresh unread messages
-      );
-
-      // Only refresh if there are unread sender messages and not too many
-      if (senderMessages.length > 0 && senderMessages.length <= 5) {
-        console.log(`🔄 Refreshing read status for ${senderMessages.length} sender messages`);
-
-        // Refresh read status for each sender message with delay to avoid spam
-        for (let i = 0; i < senderMessages.length; i++) {
-          const msg = senderMessages[i];
-          setTimeout(async () => {
-            try {
-              await refreshMessageReadStatus(msg.id);
-            } catch (error) {
-              console.error(`Failed to refresh read status for message ${msg.id}:`, error);
-            }
-          }, i * 200); // 200ms delay between each request
-        }
-      }
-    };
-
-    // Refresh every 15 seconds to reduce API load (was 5 seconds)
-    const interval = setInterval(refreshSenderMessages, 15000);
-
-    return () => clearInterval(interval);
-  }, [messages, user, selectedChatroom, refreshMessageReadStatus]);
+  // Removed excessive periodic refresh - now using optimistic updates and WebSocket only
 
   // Extract filename from URL
   const getFilenameFromUrl = (url: string) => {
@@ -632,19 +649,11 @@ const MessageList: React.FC<MessageListProps> = ({
                     {message.sender_id === user?.user_id && (
                       <div className="flex items-center ml-1">
                         {(() => {
-                          // Debug logging for tick rendering
+                          // Optimized tick rendering without excessive logging
                           const readStatus = message.read_status || [];
                           const allRead = readStatus.length > 0 && readStatus.every(status => status.is_read);
                           const readCount = readStatus.filter(status => status.is_read).length;
                           const totalCount = readStatus.length;
-
-                          console.log(`🎨 Rendering ticks for message ${message.id}:`, {
-                            readStatus,
-                            allRead,
-                            readCount,
-                            totalCount,
-                            tickColor: allRead ? 'BLUE' : 'GREY'
-                          });
 
                           if (allRead) {
                             // All read - blue double tick with animation
