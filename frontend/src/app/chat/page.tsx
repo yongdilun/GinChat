@@ -186,17 +186,29 @@ function ChatPageContent() {
     };
   }, [selectedChatroom, chatroomMedia]);
 
+  // Use WebSocket context
+  const { lastMessage, connectToRoom, disconnectFromRoom, currentRoomId } = useWebSocket();
 
-
-  // Clear processed messages when changing rooms
+  // Connect to WebSocket room when chatroom is selected
   useEffect(() => {
     if (selectedChatroom) {
       processedMessageIdsRef.current = new Set();
-    }
-  }, [selectedChatroom]);
 
-  // Use WebSocket context
-  const { lastMessage } = useWebSocket();
+      // Connect to the selected chatroom via WebSocket
+      if (currentRoomId !== selectedChatroom.id) {
+        console.log('Connecting to WebSocket room:', selectedChatroom.id);
+        connectToRoom(selectedChatroom.id);
+      }
+    } else {
+      // Disconnect when no chatroom is selected
+      if (currentRoomId) {
+        console.log('Disconnecting from WebSocket room');
+        disconnectFromRoom();
+      }
+    }
+  }, [selectedChatroom, connectToRoom, disconnectFromRoom, currentRoomId]);
+
+
 
   // Handle WebSocket messages
   useEffect(() => {

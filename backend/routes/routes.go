@@ -91,11 +91,8 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, mongodb *mongo.Database, logger *lo
 			// Media routes
 			protected.POST("/media/upload", mediaController.UploadMedia)
 		}
-		// WebSocket route OUTSIDE protected group for chat rooms (token + room_id)
+		// WebSocket route OUTSIDE protected group for both mobile and web (token + room_id)
 		api.GET("/ws", websocketController.HandleConnection)
-
-		// WebSocket route for sidebar updates (user_id only) - for frontend web app
-		r.GET("/ws", websocketController.HandleConnection)
 	}
 
 	// Debug route for WebSocket connection

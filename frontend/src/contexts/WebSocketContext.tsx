@@ -11,6 +11,9 @@ interface WebSocketContextType {
   sendMessage: (message: WebSocketMessage) => void;
   lastMessage: WebSocketMessage | null;
   connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'error';
+  connectToRoom: (roomId: string) => void;
+  disconnectFromRoom: () => void;
+  currentRoomId: string | null;
 }
 
 const WebSocketContext = createContext<WebSocketContextType | undefined>(undefined);
@@ -31,6 +34,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('disconnected');
+  const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttempts = useRef(0);
@@ -58,7 +62,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     return { user, token };
   }, [isBrowser]);
 
-  const connect = useCallback(() => {
+  const connectToRoom = useCallback((roomId: string) => {
     const { user, token } = getAuthData();
 
     if (!user || !token) {
@@ -67,17 +71,22 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     }
 
     if (wsRef.current?.readyState === WebSocket.CONNECTING || wsRef.current?.readyState === WebSocket.OPEN) {
-      console.log('WebSocket already connecting or connected');
-      return;
+      if (currentRoomId === roomId) {
+        console.log('Already connected to the same room');
+        return;
+      }
+      console.log('Disconnecting from current room to connect to new room');
+      disconnect();
     }
 
     setConnectionStatus('connecting');
-    console.log('Connecting to WebSocket...');
+    setCurrentRoomId(roomId);
+    console.log('Connecting to WebSocket room:', roomId);
 
-    // Create WebSocket connection with user_id for sidebar updates only
+    // Create WebSocket connection with token and room_id (same as mobile)
     // Use the same base URL as the API but with ws protocol
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-    const wsUrl = apiUrl.replace('http://', 'ws://').replace('https://', 'wss://') + `/ws?user_id=${user.user_id}`;
+    const wsUrl = apiUrl.replace('http://', 'ws://').replace('https://', 'wss://') + `/api/ws?token=${encodeURIComponent(token)}&room_id=${encodeURIComponent(roomId)}`;
 
     console.log('Attempting WebSocket connection to:', wsUrl);
     const ws = new WebSocket(wsUrl);
@@ -113,7 +122,9 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
         reconnectTimeoutRef.current = setTimeout(() => {
           reconnectAttempts.current++;
-          connect();
+          if (currentRoomId) {
+            connectToRoom(currentRoomId);
+          }
         }, delay);
       }
     };
@@ -126,7 +137,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     wsRef.current = ws;
   }, [getAuthData]);
 
-  const disconnect = () => {
+  const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
@@ -139,8 +150,13 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
     setIsConnected(false);
     setConnectionStatus('disconnected');
+    setCurrentRoomId(null);
     reconnectAttempts.current = 0;
-  };
+  }, []);
+
+  const disconnectFromRoom = useCallback(() => {
+    disconnect();
+  }, [disconnect]);
 
   const sendMessage = useCallback((message: WebSocketMessage) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -150,35 +166,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     }
   }, []);
 
-  // Connect when component mounts and check auth status
+  // Cleanup on unmount
   useEffect(() => {
-    const { user, token } = getAuthData();
-    if (user && token) {
-      connect();
-    } else {
-      disconnect();
-    }
-
-    // Set up interval to check auth status periodically
-    const authCheckInterval = setInterval(() => {
-      const { user: currentUser, token: currentToken } = getAuthData();
-      const isCurrentlyConnected = wsRef.current?.readyState === WebSocket.OPEN;
-
-      if (currentUser && currentToken && !isCurrentlyConnected) {
-        // User is authenticated but not connected, try to connect
-        connect();
-      } else if ((!currentUser || !currentToken) && isCurrentlyConnected) {
-        // User is not authenticated but still connected, disconnect
-        disconnect();
-      }
-    }, 5000); // Check every 5 seconds
-
-    // Cleanup on unmount
     return () => {
-      clearInterval(authCheckInterval);
       disconnect();
     };
-  }, [connect, getAuthData]); // Include dependencies
+  }, [disconnect]);
 
   // Ping to keep connection alive
   useEffect(() => {
@@ -199,6 +192,9 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     sendMessage,
     lastMessage,
     connectionStatus,
+    connectToRoom,
+    disconnectFromRoom,
+    currentRoomId,
   };
 
   return (

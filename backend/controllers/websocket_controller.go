@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -104,14 +103,7 @@ const (
 
 // HandleConnection handles a WebSocket connection
 func (wsc *WebSocketController) HandleConnection(c *gin.Context) {
-	// Check if this is a simple user_id connection (for sidebar)
-	userIDStr := c.Query("user_id")
-	if userIDStr != "" {
-		wsc.HandleSimpleConnection(c)
-		return
-	}
-
-	// Original token-based connection for chat rooms
+	// Unified token-based connection for both mobile and web
 	// Always get token from query param
 	token := c.Query("token")
 	if token == "" {
@@ -248,124 +240,6 @@ func (wsc *WebSocketController) HandleConnection(c *gin.Context) {
 				}
 				wsc.clientsMux.RUnlock()
 			}
-		}
-	}
-}
-
-// HandleSimpleConnection handles a simple WebSocket connection for sidebar updates
-func (wsc *WebSocketController) HandleSimpleConnection(c *gin.Context) {
-	// Get user ID from query param
-	userIDStr := c.Query("user_id")
-	if userIDStr == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No user_id provided"})
-		return
-	}
-
-	// Convert user ID to uint
-	var uid uint
-	if _, err := fmt.Sscanf(userIDStr, "%d", &uid); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user_id"})
-		return
-	}
-
-	// Apply rate limiting for connection attempts
-	if !wsc.canConnect(uid) {
-		c.JSON(http.StatusTooManyRequests, gin.H{"error": "Too many connection attempts, please wait"})
-		return
-	}
-
-	// Upgrade HTTP connection to WebSocket
-	rawConn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
-	if err != nil {
-		wsc.logger.Errorf("Failed to upgrade WebSocket connection: %v", err)
-		return
-	}
-
-	// Wrap in SafeWebSocketConn
-	conn := NewSafeWebSocketConn(rawConn)
-
-	// Register client for sidebar updates (no specific room)
-	wsc.clientsMux.Lock()
-	if _, ok := wsc.clients[uid]; !ok {
-		wsc.clients[uid] = make(map[*SafeWebSocketConn]bool)
-	}
-	wsc.clients[uid][conn] = true
-	wsc.clientsMux.Unlock()
-
-	wsc.logger.Infof("User %d (sidebar connection) connected via simple WebSocket", uid)
-
-	// Send connection success message
-	connectMsg := WebSocketMessage{
-		Type: "connected",
-		Data: map[string]any{
-			"message": "Connected to WebSocket server",
-			"user_id": uid,
-			"type":    "sidebar",
-		},
-	}
-	connectJSON, _ := json.Marshal(connectMsg)
-	conn.WriteMessage(websocket.TextMessage, connectJSON)
-
-	// Handle client disconnection
-	defer func() {
-		// Recover from any panics during cleanup
-		if r := recover(); r != nil {
-			wsc.logger.Errorf("Panic during sidebar WebSocket cleanup for user %d: %v", uid, r)
-		}
-
-		wsc.clientsMux.Lock()
-		// Remove from clients map
-		if connections, ok := wsc.clients[uid]; ok {
-			delete(connections, conn)
-			if len(connections) == 0 {
-				delete(wsc.clients, uid)
-			}
-		}
-		wsc.clientsMux.Unlock()
-		conn.Close()
-		wsc.logger.Infof("User %d (sidebar connection) disconnected from simple WebSocket", uid)
-	}()
-
-	// Start ping-pong to keep connection alive
-	go wsc.pingClient(conn, uid)
-
-	// Handle incoming messages
-	for {
-		_, message, err := conn.ReadMessage()
-		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				wsc.logger.Errorf("WebSocket error for user %d: %v", uid, err)
-			}
-			break
-		}
-
-		// Process message
-		var msg WebSocketMessage
-		if err := json.Unmarshal(message, &msg); err != nil {
-			continue
-		}
-
-		// Handle different message types
-		switch msg.Type {
-		case "ping":
-			// Respond with pong
-			pongMsg := WebSocketMessage{
-				Type: "pong",
-				Data: map[string]any{
-					"timestamp": time.Now().Format(time.RFC3339),
-				},
-			}
-			pongJSON, _ := json.Marshal(pongMsg)
-			conn.WriteMessage(websocket.TextMessage, pongJSON)
-		case "heartbeat":
-			heartbeatMsg := WebSocketMessage{
-				Type: "heartbeat_ack",
-				Data: map[string]any{
-					"timestamp": time.Now().Format(time.RFC3339),
-				},
-			}
-			heartbeatJSON, _ := json.Marshal(heartbeatMsg)
-			conn.WriteMessage(websocket.TextMessage, heartbeatJSON)
 		}
 	}
 }
