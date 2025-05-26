@@ -277,7 +277,7 @@ const MessageList: React.FC<MessageListProps> = ({
     }, 1000); // Reduced to 1 second for better UX
 
     return () => clearTimeout(timer);
-  }, [selectedChatroom, user, messages, onMessageReadStatusUpdate]);
+  }, [selectedChatroom, user]); // FIXED: Removed 'messages' and 'onMessageReadStatusUpdate' to prevent infinite loop
 
   // Reset first unread message when chatroom changes (FIXED: Only on chatroom change)
   useEffect(() => {
