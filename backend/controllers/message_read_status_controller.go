@@ -1,14 +1,11 @@
 package controllers
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ginchat/models"
 	"github.com/ginchat/services"
 	"github.com/ginchat/utils"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -64,8 +61,8 @@ func (c *MessageReadStatusController) MarkMessageAsRead(ctx *gin.Context) {
 		return
 	}
 
-	// Mark message as read
-	err = c.ReadStatusService.MarkMessageAsRead(messageObjectID, userID.(uint))
+	// Mark message as read (optimized - returns chatroom ID to avoid extra query)
+	chatroomID, err := c.ReadStatusService.MarkMessageAsReadOptimized(messageObjectID, userID.(uint))
 	if err != nil {
 		if err.Error() == "read status not found" {
 			ctx.JSON(http.StatusNotFound, gin.H{"error": "Message not found or already read"})
@@ -75,35 +72,28 @@ func (c *MessageReadStatusController) MarkMessageAsRead(ctx *gin.Context) {
 		return
 	}
 
-	// Send WebSocket notification about message read status update (simplified)
-	readStatus, err := c.ReadStatusService.GetMessageReadStatus(messageObjectID)
-	if err == nil {
-		// Get the message to find the chatroom
-		var message models.Message
-		err := c.ReadStatusService.MessageColl.FindOne(context.Background(), bson.M{"_id": messageObjectID}).Decode(&message)
+	// Return success immediately for better performance
+	ctx.JSON(http.StatusOK, gin.H{"message": "Message marked as read successfully"})
+
+	// Handle WebSocket notifications asynchronously (non-blocking)
+	go func() {
+		// Get updated read status and broadcast
+		readStatus, err := c.ReadStatusService.GetMessageReadStatus(messageObjectID)
 		if err == nil {
-			// Broadcast simple read status update to the chatroom
-			BroadcastMessageReadGlobal(message.ChatroomID.Hex(), map[string]any{
+			// Broadcast read status update with user_id for filtering
+			BroadcastMessageReadGlobal(chatroomID.Hex(), map[string]any{
 				"message_id":  messageObjectID.Hex(),
 				"read_status": readStatus,
+				"user_id":     userID.(uint),
 			})
-
-			// Get updated unread counts for all users in the chatroom (async)
-			go func() {
-				chatroom, err := c.ReadStatusService.ChatroomService.GetChatroomByID(message.ChatroomID)
-				if err == nil {
-					for _, member := range chatroom.Members {
-						unreadCounts, err := c.ReadStatusService.GetUnreadCountForUser(member.UserID)
-						if err == nil {
-							BroadcastUnreadCountUpdateGlobal(member.UserID, unreadCounts)
-						}
-					}
-				}
-			}()
 		}
-	}
 
-	ctx.JSON(http.StatusOK, gin.H{"message": "Message marked as read successfully"})
+		// Update unread counts for current user only (more efficient)
+		unreadCounts, err := c.ReadStatusService.GetUnreadCountForUser(userID.(uint))
+		if err == nil {
+			BroadcastUnreadCountUpdateGlobal(userID.(uint), unreadCounts)
+		}
+	}()
 }
 
 // GetUserLastReadForChatroom gets the last read message for a user in a specific chatroom
@@ -372,47 +362,32 @@ func (c *MessageReadStatusController) MarkAllMessagesInChatroomAsRead(ctx *gin.C
 		return
 	}
 
-	// Get all unread messages before marking them as read
-	unreadMessages, err := c.ReadStatusService.GetUnreadMessagesInChatroom(chatroomID, userID.(uint))
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": utils.FormatServiceError(err)})
-		return
-	}
-
-	// Mark all messages as read
+	// Mark all messages as read (optimized - no need to get unread messages first)
 	err = c.ReadStatusService.MarkAllMessagesInChatroomAsRead(chatroomID, userID.(uint))
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": utils.FormatServiceError(err)})
 		return
 	}
 
-	// Send WebSocket notifications for messages that were marked as read (simplified and async)
+	// Return success immediately for better performance
+	ctx.JSON(http.StatusOK, gin.H{"message": "All messages marked as read successfully"})
+
+	// Handle WebSocket notifications asynchronously (non-blocking)
 	go func() {
-		for _, message := range unreadMessages {
-			readStatus, err := c.ReadStatusService.GetMessageReadStatus(message.ID)
-			if err == nil {
-				// Broadcast simple read status update for this specific message
-				BroadcastMessageReadGlobal(chatroomID.Hex(), map[string]any{
-					"message_id":  message.ID.Hex(),
-					"read_status": readStatus,
-				})
-			}
+		// Send a single bulk read status update instead of individual messages
+		BroadcastMessageReadGlobal(chatroomID.Hex(), map[string]any{
+			"type":        "bulk_read",
+			"chatroom_id": chatroomID.Hex(),
+			"user_id":     userID.(uint),
+			"read_all":    true,
+		})
+
+		// Update unread counts for current user only (more efficient)
+		unreadCounts, err := c.ReadStatusService.GetUnreadCountForUser(userID.(uint))
+		if err == nil {
+			BroadcastUnreadCountUpdateGlobal(userID.(uint), unreadCounts)
 		}
 	}()
-
-	// Send WebSocket notification about unread count updates
-	chatroom, err := c.ReadStatusService.ChatroomService.GetChatroomByID(chatroomID)
-	if err == nil {
-		// Get updated unread counts for all users in the chatroom
-		for _, member := range chatroom.Members {
-			unreadCounts, err := c.ReadStatusService.GetUnreadCountForUser(member.UserID)
-			if err == nil {
-				BroadcastUnreadCountUpdateGlobal(member.UserID, unreadCounts)
-			}
-		}
-	}
-
-	ctx.JSON(http.StatusOK, gin.H{"message": "All messages marked as read successfully"})
 }
 
 // GetFirstUnreadMessageInChatroom gets the first unread message for the authenticated user in a chatroom

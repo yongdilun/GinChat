@@ -121,6 +121,52 @@ func (s *MessageReadStatusService) MarkMessageAsRead(messageID primitive.ObjectI
 	return nil
 }
 
+// MarkMessageAsReadOptimized marks a message as read by a specific user (optimized version)
+// Returns the chatroom ID to avoid additional database queries
+func (s *MessageReadStatusService) MarkMessageAsReadOptimized(messageID primitive.ObjectID, userID uint) (primitive.ObjectID, error) {
+	now := time.Now()
+
+	// Get the message and chatroom ID in a single query
+	var message models.Message
+	err := s.MessageColl.FindOne(context.Background(), bson.M{"_id": messageID}).Decode(&message)
+	if err != nil {
+		return primitive.NilObjectID, errors.New("message not found")
+	}
+
+	// Update the read status
+	filter := bson.M{
+		"message_id":   messageID,
+		"recipient_id": userID,
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"is_read": true,
+			"read_at": now,
+		},
+	}
+
+	result, err := s.ReadStatusColl.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		return primitive.NilObjectID, errors.New("failed to mark message as read")
+	}
+
+	if result.MatchedCount == 0 {
+		return primitive.NilObjectID, errors.New("read status not found")
+	}
+
+	// Update user's last read message for the chatroom (async to avoid blocking)
+	go func() {
+		err = s.UpdateUserLastRead(messageID, userID)
+		if err != nil {
+			// Log error but don't fail the operation
+			// This is not critical for the read status update
+		}
+	}()
+
+	return message.ChatroomID, nil
+}
+
 // UpdateUserLastRead updates the last read message for a user in a chatroom
 func (s *MessageReadStatusService) UpdateUserLastRead(messageID primitive.ObjectID, userID uint) error {
 	// Get the message to find the chatroom
@@ -215,7 +261,7 @@ func (s *MessageReadStatusService) GetUserLastReadForChatroom(chatroomID primiti
 	return &lastRead, nil
 }
 
-// GetUnreadCountForUser gets unread message count for all chatrooms for a user
+// GetUnreadCountForUser gets unread message count for all chatrooms for a user (optimized)
 func (s *MessageReadStatusService) GetUnreadCountForUser(userID uint) ([]models.ChatroomUnreadCount, error) {
 	// First, let's get all chatrooms the user is a member of
 	chatroomCursor, err := s.ChatroomColl.Find(context.Background(), bson.M{
@@ -231,21 +277,54 @@ func (s *MessageReadStatusService) GetUnreadCountForUser(userID uint) ([]models.
 		return nil, errors.New("failed to decode user chatrooms")
 	}
 
-	var unreadCounts []models.ChatroomUnreadCount
-
-	// For each chatroom, count unread messages
+	// Create a map of chatroom IDs for quick lookup
+	chatroomMap := make(map[string]models.Chatroom)
+	var chatroomIDs []primitive.ObjectID
 	for _, chatroom := range userChatrooms {
-		count, err := s.ReadStatusColl.CountDocuments(context.Background(), bson.M{
-			"chatroom_id":  chatroom.ID,
-			"recipient_id": userID,
-			"is_read":      false,
-		})
-		if err != nil {
-			// Log error but continue with other chatrooms
+		chatroomMap[chatroom.ID.Hex()] = chatroom
+		chatroomIDs = append(chatroomIDs, chatroom.ID)
+	}
+
+	// Use aggregation pipeline for better performance (single query instead of N queries)
+	pipeline := []bson.M{
+		{
+			"$match": bson.M{
+				"chatroom_id":  bson.M{"$in": chatroomIDs},
+				"recipient_id": userID,
+				"is_read":      false,
+			},
+		},
+		{
+			"$group": bson.M{
+				"_id":   "$chatroom_id",
+				"count": bson.M{"$sum": 1},
+			},
+		},
+	}
+
+	cursor, err := s.ReadStatusColl.Aggregate(context.Background(), pipeline)
+	if err != nil {
+		return nil, errors.New("failed to aggregate unread counts")
+	}
+	defer cursor.Close(context.Background())
+
+	// Create result map
+	unreadMap := make(map[string]int64)
+	for cursor.Next(context.Background()) {
+		var result struct {
+			ID    primitive.ObjectID `bson:"_id"`
+			Count int64              `bson:"count"`
+		}
+		if err := cursor.Decode(&result); err != nil {
 			continue
 		}
+		unreadMap[result.ID.Hex()] = result.Count
+	}
 
-		// Add to results even if count is 0 (for debugging)
+	// Build final result with all chatrooms (including 0 counts)
+	var unreadCounts []models.ChatroomUnreadCount
+	for _, chatroom := range userChatrooms {
+		count := unreadMap[chatroom.ID.Hex()] // Will be 0 if not found
 		unreadCount := models.ChatroomUnreadCount{
 			ChatroomID:   chatroom.ID.Hex(),
 			ChatroomName: chatroom.Name,
