@@ -74,10 +74,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     setConnectionStatus('connecting');
     console.log('Connecting to WebSocket...');
 
-    // Create WebSocket connection with token and room_id (matching mobile pattern)
+    // Create WebSocket connection with user_id for sidebar updates only
     // Use the same base URL as the API but with ws protocol
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-    const wsUrl = apiUrl.replace('http://', 'ws://').replace('https://', 'wss://') + `/api/ws?token=${encodeURIComponent(token)}&room_id=general`;
+    const wsUrl = apiUrl.replace('http://', 'ws://').replace('https://', 'wss://') + `/ws?user_id=${user.user_id}`;
 
     console.log('Attempting WebSocket connection to:', wsUrl);
     const ws = new WebSocket(wsUrl);

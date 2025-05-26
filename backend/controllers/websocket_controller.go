@@ -140,15 +140,8 @@ func (wsc *WebSocketController) HandleConnection(c *gin.Context) {
 		return
 	}
 
-	// Close existing connections for this user (simplified)
-	wsc.clientsMux.Lock()
-	if conns, ok := wsc.clients[uid]; ok {
-		for safeConn := range conns {
-			safeConn.Close()
-		}
-		delete(wsc.clients, uid)
-	}
-	wsc.clientsMux.Unlock()
+	// Allow multiple connections per user (don't close existing connections)
+	// This allows both mobile app (chat room) and web app (sidebar) to connect simultaneously
 
 	// Upgrade HTTP connection to WebSocket
 	rawConn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
