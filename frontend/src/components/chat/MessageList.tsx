@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import Image from 'next/image';
 import { User, Chatroom, Message, ReadInfo } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -172,7 +172,7 @@ const MessageList: React.FC<MessageListProps> = ({
 
     // Only run when chatroom changes, not when messages change
     getFirstUnreadAndNavigate();
-  }, [selectedChatroom?.id, user?.user_id]); // Removed messages dependency
+  }, [selectedChatroom, user]); // Include full objects for proper dependency tracking
 
   // Manual mark message as read when clicked (for testing real-time updates)
   const handleMessageClick = async (messageId: string) => {
@@ -190,7 +190,7 @@ const MessageList: React.FC<MessageListProps> = ({
   };
 
   // Refresh read status for a specific message (using same approach as working read status modal)
-  const refreshMessageReadStatus = async (messageId: string) => {
+  const refreshMessageReadStatus = useCallback(async (messageId: string) => {
     try {
       console.log('🔄 Refreshing read status for message:', messageId);
       const response = await messageReadStatusAPI.getMessageReadStatus(messageId);
@@ -204,7 +204,7 @@ const MessageList: React.FC<MessageListProps> = ({
     } catch (error) {
       console.error('Failed to refresh read status:', error);
     }
-  };
+  }, [onMessageReadStatusUpdate]);
 
   // Auto-mark all messages as read when entering chatroom (FIXED: Only clear label on manual action)
   useEffect(() => {
@@ -279,7 +279,7 @@ const MessageList: React.FC<MessageListProps> = ({
     const interval = setInterval(refreshSenderMessages, 5000);
 
     return () => clearInterval(interval);
-  }, [messages, user, selectedChatroom]);
+  }, [messages, user, selectedChatroom, refreshMessageReadStatus]);
 
   // Extract filename from URL
   const getFilenameFromUrl = (url: string) => {

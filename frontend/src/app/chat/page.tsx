@@ -186,8 +186,7 @@ function ChatPageContent() {
     };
   }, [selectedChatroom, chatroomMedia]);
 
-  // Get authentication token for WebSocket
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+
 
   // Clear processed messages when changing rooms
   useEffect(() => {
@@ -197,14 +196,14 @@ function ChatPageContent() {
   }, [selectedChatroom]);
 
   // Use WebSocket context
-  const { lastMessage, isConnected, connectionStatus } = useWebSocket();
+  const { lastMessage } = useWebSocket();
 
   // Handle WebSocket messages
   useEffect(() => {
     if (lastMessage) {
       handleWebSocketMessage({ data: JSON.stringify(lastMessage) } as MessageEvent);
     }
-  }, [lastMessage]);
+  }, [lastMessage, handleWebSocketMessage]);
 
   // Fetch chatrooms
   const fetchChatrooms = useCallback(async () => {
