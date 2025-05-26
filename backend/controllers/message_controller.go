@@ -266,7 +266,23 @@ func (mc *MessageController) UpdateMessage(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": message.ToResponse()})
+	// Broadcast the message update to all connected clients
+	messageResponse := message.ToResponse()
+
+	// Get read status for the updated message
+	if mc.MessageService.ReadStatusSvc != nil {
+		readStatus, err := mc.MessageService.ReadStatusSvc.GetMessageReadStatus(message.ID)
+		if err == nil {
+			messageResponse.ReadStatus = readStatus
+		}
+	}
+
+	// Check if GlobalWebSocketController is available
+	if GlobalWebSocketController != nil {
+		BroadcastMessageUpdatedGlobal(message.ChatroomID.Hex(), messageResponse)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": messageResponse})
 }
 
 // DeleteMessage handles deleting a message
@@ -299,6 +315,13 @@ func (mc *MessageController) DeleteMessage(c *gin.Context) {
 		return
 	}
 
+	// Get chatroom ID from URL for WebSocket broadcasting
+	chatroomID, err := primitive.ObjectIDFromHex(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Please provide a valid chatroom ID"})
+		return
+	}
+
 	// Delete message using the service
 	err = mc.MessageService.DeleteMessage(messageID, userID.(uint))
 	if err != nil {
@@ -311,6 +334,15 @@ func (mc *MessageController) DeleteMessage(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": utils.FormatServiceError(err)})
 		}
 		return
+	}
+
+	// Broadcast the message deletion to all connected clients
+	if GlobalWebSocketController != nil {
+		deleteData := map[string]any{
+			"message_id":  messageID.Hex(),
+			"chatroom_id": chatroomID.Hex(),
+		}
+		BroadcastMessageDeletedGlobal(chatroomID.Hex(), deleteData)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Message deleted successfully"})

@@ -9,8 +9,7 @@ import MessageList from '@/components/chat/MessageList';
 import MessageInput from '@/components/chat/MessageInput';
 import { User, Chatroom, Message, WebSocketMessage, ReadInfo } from '@/types';
 import { chatroomAPI, messageAPI } from '@/services/api';
-import useWebSocket from '@/hooks/useWebSocket';
-import { WebSocketProvider } from '@/contexts/WebSocketContext';
+import { WebSocketProvider, useWebSocket } from '@/contexts/WebSocketContext';
 
 // Interface for media inside chatrooms
 interface Media {
@@ -98,8 +97,7 @@ function ChatPageContent() {
   const [selectedChatroom, setSelectedChatroom] = useState<Chatroom | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const disconnectRef = useRef<(() => void) | null>(null);
-  const [wsUrl, setWsUrl] = useState<string>('');
+
   // Track processed message IDs to prevent duplication
   const processedMessageIdsRef = useRef<Set<string>>(new Set());
   const [hasFetchedData, setHasFetchedData] = useState(false);
@@ -191,54 +189,22 @@ function ChatPageContent() {
   // Get authentication token for WebSocket
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
-  // Update wsUrl when selectedChatroom changes
+  // Clear processed messages when changing rooms
   useEffect(() => {
-    if (token && selectedChatroom) {
-      const wsBaseUrl = process.env.NEXT_PUBLIC_WS_URL;
-      setWsUrl(`${wsBaseUrl}/api/ws?token=${encodeURIComponent(token)}&room_id=${encodeURIComponent(selectedChatroom.id)}`);
-
-      // Clear processed messages when changing rooms
+    if (selectedChatroom) {
       processedMessageIdsRef.current = new Set();
-    } else {
-      setWsUrl('');
     }
-  }, [token, selectedChatroom]);
+  }, [selectedChatroom]);
 
-  // Create WebSocket connection - always create the hook, even with empty URL
-  const { disconnect } = useWebSocket(
-    wsUrl,
-    {
-      onMessage: handleWebSocketMessage,
-      onOpen: () => {
-        console.log('WebSocket connected');
-      },
-      onClose: (event) => {
-        console.log('WebSocket disconnected:', event);
-        // Attempt to reconnect if not a normal closure
-        if (event.code !== 1000 && event.code !== 1001) {
-          console.log('Attempting to reconnect...');
-        }
-      },
-      onError: (error) => {
-        console.error('WebSocket error:', error);
-      },
-      headers: token ? { 'Authorization': `Bearer ${token}` } : undefined,
-    }
-  );
+  // Use WebSocket context
+  const { lastMessage, isConnected, connectionStatus } = useWebSocket();
 
-  // Store disconnect function in ref and handle cleanup
+  // Handle WebSocket messages
   useEffect(() => {
-    // Store the current disconnect function
-    disconnectRef.current = disconnect;
-
-    // Cleanup function - this runs when the component unmounts or before the next effect runs
-    return () => {
-      if (disconnectRef.current) {
-        disconnectRef.current();
-        disconnectRef.current = null;
-      }
-    };
-  }, [disconnect]); // Only depend on disconnect, not wsUrl
+    if (lastMessage) {
+      handleWebSocketMessage({ data: JSON.stringify(lastMessage) } as MessageEvent);
+    }
+  }, [lastMessage]);
 
   // Fetch chatrooms
   const fetchChatrooms = useCallback(async () => {

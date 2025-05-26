@@ -52,7 +52,6 @@ type WebSocketController struct {
 	clientsMux            sync.RWMutex
 	broadcast             chan []byte
 	logger                *logrus.Logger
-	processedMessages     map[string]map[string]bool
 	connectionAttempts    map[uint]time.Time
 	connectionAttemptsMux sync.RWMutex
 }
@@ -67,7 +66,6 @@ func NewWebSocketController(logger *logrus.Logger) *WebSocketController {
 		rooms:              make(map[string]map[*SafeWebSocketConn]bool),
 		broadcast:          make(chan []byte),
 		logger:             logger,
-		processedMessages:  make(map[string]map[string]bool),
 		connectionAttempts: make(map[uint]time.Time),
 	}
 
@@ -101,7 +99,7 @@ var upgrader = websocket.Upgrader{
 
 // Rate limiting constants
 const (
-	connectionCooldown = 500 * time.Millisecond // Minimum time between connection attempts
+	connectionCooldown = 2 * time.Second // Increased to 2 seconds to reduce conflicts
 )
 
 // HandleConnection handles a WebSocket connection
@@ -142,22 +140,12 @@ func (wsc *WebSocketController) HandleConnection(c *gin.Context) {
 		return
 	}
 
-	// Check if this user already has a connection in this room and close it if they do
+	// Close existing connections for this user (simplified)
 	wsc.clientsMux.Lock()
 	if conns, ok := wsc.clients[uid]; ok {
-		// Close all existing connections for this user
 		for safeConn := range conns {
-			// Remove from room
-			for r, clients := range wsc.rooms {
-				delete(clients, safeConn)
-				if len(clients) == 0 {
-					delete(wsc.rooms, r)
-				}
-			}
-			// Close the connection
 			safeConn.Close()
 		}
-		// Clear all connections for this user
 		delete(wsc.clients, uid)
 	}
 	wsc.clientsMux.Unlock()
@@ -243,22 +231,7 @@ func (wsc *WebSocketController) HandleConnection(c *gin.Context) {
 			continue
 		}
 
-		// Check if this message has already been processed to prevent duplicates
-		messageID := string(message)
-		if msg.ChatroomID != "" {
-			wsc.clientsMux.Lock()
-			if _, ok := wsc.processedMessages[msg.ChatroomID]; !ok {
-				wsc.processedMessages[msg.ChatroomID] = make(map[string]bool)
-			}
-			// Skip if already processed
-			if wsc.processedMessages[msg.ChatroomID][messageID] {
-				wsc.clientsMux.Unlock()
-				continue
-			}
-			// Mark as processed
-			wsc.processedMessages[msg.ChatroomID][messageID] = true
-			wsc.clientsMux.Unlock()
-		}
+		// Process message directly (removed duplicate prevention for simplicity)
 
 		// Handle different message types
 		switch msg.Type {
@@ -436,27 +409,13 @@ func (wsc *WebSocketController) cleanupConnectionAttempts() {
 		}
 		wsc.connectionAttemptsMux.Unlock()
 
-		// Also clean up processed messages to prevent memory leaks
-		wsc.clientsMux.Lock()
-		for roomID, messages := range wsc.processedMessages {
-			// Check if room still exists
-			if _, exists := wsc.rooms[roomID]; !exists {
-				delete(wsc.processedMessages, roomID)
-				continue
-			}
-			// Remove messages older than 1 hour (not implemented here - would need message timestamps)
-			if len(messages) > 1000 {
-				// If too many messages, just reset the map
-				wsc.processedMessages[roomID] = make(map[string]bool)
-			}
-		}
-		wsc.clientsMux.Unlock()
+		// Cleanup completed (removed processed messages tracking for simplicity)
 	}
 }
 
 // pingClient sends periodic pings to keep the connection alive
 func (wsc *WebSocketController) pingClient(conn *SafeWebSocketConn, _ uint) {
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(90 * time.Second) // Increased to 90 seconds to avoid conflicts
 	defer ticker.Stop()
 
 	for range ticker.C {
@@ -581,6 +540,110 @@ func (wsc *WebSocketController) BroadcastMessageRead(chatroomID string, readData
 func BroadcastMessageReadGlobal(chatroomID string, readData any) {
 	if GlobalWebSocketController != nil {
 		GlobalWebSocketController.BroadcastMessageRead(chatroomID, readData)
+	}
+}
+
+// BroadcastMessageUpdated broadcasts message update events to clients in a specific chatroom
+func (wsc *WebSocketController) BroadcastMessageUpdated(chatroomID string, messageData any) {
+	if wsc == nil {
+		return // Safety check
+	}
+
+	// Create WebSocket message
+	wsMessage := WebSocketMessage{
+		Type:       "message_updated",
+		ChatroomID: chatroomID,
+		Data:       messageData,
+	}
+
+	// Marshal to JSON
+	jsonMessage, err := json.Marshal(wsMessage)
+	if err != nil {
+		wsc.logger.Errorf("Failed to marshal WebSocket message: %v", err)
+		return
+	}
+
+	// Send to broadcast channel for room-specific broadcasting
+	wsc.broadcast <- jsonMessage
+
+	// Also send to all connected users for sidebar updates
+	wsc.clientsMux.RLock()
+	for userID, connections := range wsc.clients {
+		for conn := range connections {
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						wsc.logger.Errorf("Panic while broadcasting message update to user %d: %v", userID, r)
+					}
+				}()
+				err := conn.WriteMessage(websocket.TextMessage, jsonMessage)
+				if err != nil {
+					wsc.logger.Errorf("Failed to send message update notification to user %d: %v", userID, err)
+				}
+			}()
+		}
+	}
+	wsc.clientsMux.RUnlock()
+
+	wsc.logger.Infof("Broadcasted message update to chatroom %s", chatroomID)
+}
+
+// BroadcastMessageUpdatedGlobal is a helper function to broadcast message updates using the global controller
+func BroadcastMessageUpdatedGlobal(chatroomID string, messageData any) {
+	if GlobalWebSocketController != nil {
+		GlobalWebSocketController.BroadcastMessageUpdated(chatroomID, messageData)
+	}
+}
+
+// BroadcastMessageDeleted broadcasts message deletion events to clients in a specific chatroom
+func (wsc *WebSocketController) BroadcastMessageDeleted(chatroomID string, deleteData any) {
+	if wsc == nil {
+		return // Safety check
+	}
+
+	// Create WebSocket message
+	wsMessage := WebSocketMessage{
+		Type:       "message_deleted",
+		ChatroomID: chatroomID,
+		Data:       deleteData,
+	}
+
+	// Marshal to JSON
+	jsonMessage, err := json.Marshal(wsMessage)
+	if err != nil {
+		wsc.logger.Errorf("Failed to marshal WebSocket message: %v", err)
+		return
+	}
+
+	// Send to broadcast channel for room-specific broadcasting
+	wsc.broadcast <- jsonMessage
+
+	// Also send to all connected users for sidebar updates
+	wsc.clientsMux.RLock()
+	for userID, connections := range wsc.clients {
+		for conn := range connections {
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						wsc.logger.Errorf("Panic while broadcasting message deletion to user %d: %v", userID, r)
+					}
+				}()
+				err := conn.WriteMessage(websocket.TextMessage, jsonMessage)
+				if err != nil {
+					wsc.logger.Errorf("Failed to send message deletion notification to user %d: %v", userID, err)
+				}
+			}()
+		}
+	}
+	wsc.clientsMux.RUnlock()
+
+	wsc.logger.Infof("Broadcasted message deletion to chatroom %s", chatroomID)
+}
+
+// BroadcastMessageDeletedGlobal is a helper function to broadcast message deletions using the global controller
+func BroadcastMessageDeletedGlobal(chatroomID string, deleteData any) {
+	if GlobalWebSocketController != nil {
+		GlobalWebSocketController.BroadcastMessageDeleted(chatroomID, deleteData)
 	}
 }
 

@@ -91,11 +91,8 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, mongodb *mongo.Database, logger *lo
 			// Media routes
 			protected.POST("/media/upload", mediaController.UploadMedia)
 		}
-		// WebSocket route OUTSIDE protected group
+		// WebSocket route OUTSIDE protected group (only one route needed)
 		api.GET("/ws", websocketController.HandleConnection)
-
-		// Simple WebSocket route for user_id based connections
-		r.GET("/ws", websocketController.HandleConnection)
 	}
 
 	// Debug route for WebSocket connection

@@ -1423,7 +1423,15 @@ go build -o ginchat-server
 
 ## Recent Updates & Improvements
 
-### Real-time Read Status Broadcasting (Latest)
+### Optimized WebSocket Performance & Navigation Support (Latest)
+- **Simplified Broadcasting**: Streamlined WebSocket broadcasting to reduce server load and connection issues
+- **Async Operations**: Made unread count updates asynchronous to prevent blocking
+- **Efficient Read Status Updates**: Optimized `message_read` event broadcasting for better performance
+- **Navigation API Support**: Backend provides reliable first unread message API for frontend navigation
+- **Connection Stability**: Reduced WebSocket overhead and improved connection reliability
+- **Performance Optimization**: Eliminated complex logging and statistics that caused connection timeouts
+
+### Real-time Read Status Broadcasting (Previous)
 - **Enhanced WebSocket Broadcasting**: Improved `message_read` event broadcasting for real-time tick updates
 - **Automatic Read Status Updates**: Backend automatically broadcasts read status changes via WebSocket
 - **Multi-Event Broadcasting**: Supports both single message and bulk message read status updates

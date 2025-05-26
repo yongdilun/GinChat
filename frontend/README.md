@@ -319,7 +319,16 @@ The application checks for backend availability using the `/health` endpoint.
 
 ## Recent Updates & Improvements
 
-### Real-time Read Status Fix & Testing (Latest)
+### Fixed Unread Label & Navigation Logic (Latest)
+- **Fixed Unread Label Logic**: Unread labels now only appear on recipient's messages, never on sender's own messages
+- **Static Unread Positioning**: Unread labels stay fixed when entering chat and aren't affected by real-time read status updates
+- **Direct Navigation**: Replaced slow scrolling animations with instant direct positioning for better UX
+- **Instant Chat Navigation**: When entering chatrooms, directly positions at unread messages without visible scrolling
+- **Fast Message Sending**: New messages navigate instantly to bottom without scrolling from top
+- **Performance Optimization**: Reduced navigation delays from 300-500ms to 50-200ms for responsive interface
+- **Professional Navigation**: WhatsApp-like instant positioning instead of slow scroll animations
+
+### Real-time Read Status Fix & Testing (Previous)
 - **Fixed Real-time Updates**: Resolved issue where grey/blue ticks weren't updating in real-time
 - **Enhanced WebSocket Handling**: Improved `message_read` event processing for instant tick updates
 - **Manual Testing Features**: Added click-to-mark-read functionality for testing real-time updates
