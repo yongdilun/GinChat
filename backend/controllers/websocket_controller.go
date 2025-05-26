@@ -367,7 +367,7 @@ func BroadcastNewMessageGlobal(chatroomID string, message any) {
 	}
 }
 
-// BroadcastMessageRead broadcasts message read status updates to clients in a specific chatroom
+// BroadcastMessageRead broadcasts message read status updates to ALL connected clients (like new messages)
 func (wsc *WebSocketController) BroadcastMessageRead(chatroomID string, readData any) {
 	if wsc == nil {
 		return // Safety check
@@ -387,20 +387,30 @@ func (wsc *WebSocketController) BroadcastMessageRead(chatroomID string, readData
 		return
 	}
 
-	// Send read status updates only to chatroom members (avoid double broadcasting)
+	// FIXED: Send read status updates to ALL connected users (like new messages)
+	// This ensures message senders receive read status updates even if they're not in the chatroom
 	wsc.clientsMux.RLock()
-	if clients, ok := wsc.rooms[chatroomID]; ok {
-		wsc.logger.Infof("Broadcasting message read status to chatroom %s (%d connections)", chatroomID, len(clients))
-		for conn := range clients {
-			err := conn.WriteMessage(websocket.TextMessage, jsonMessage)
-			if err != nil {
-				wsc.logger.Errorf("Failed to send read status update to chatroom %s: %v", chatroomID, err)
-			}
+	totalConnections := 0
+	for userID, connections := range wsc.clients {
+		for conn := range connections {
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						wsc.logger.Errorf("Panic while broadcasting read status to user %d: %v", userID, r)
+					}
+				}()
+				err := conn.WriteMessage(websocket.TextMessage, jsonMessage)
+				if err != nil {
+					wsc.logger.Errorf("Failed to send read status update to user %d: %v", userID, err)
+				} else {
+					totalConnections++
+				}
+			}()
 		}
-	} else {
-		wsc.logger.Warnf("No connections found for chatroom %s", chatroomID)
 	}
 	wsc.clientsMux.RUnlock()
+
+	wsc.logger.Infof("Broadcasted message read status to ALL users (%d connections) for chatroom %s", totalConnections, chatroomID)
 }
 
 // BroadcastMessageReadGlobal is a helper function to broadcast message read status using the global controller
