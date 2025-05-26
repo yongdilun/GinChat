@@ -3,9 +3,19 @@ echo 🚀 Starting GinChat Database Optimization...
 echo ================================================
 
 REM Set environment variables if not already set
-if "%MONGODB_URI%"=="" set MONGODB_URI=mongodb+srv://dilunyong:ydl11222004@cluster0.nptuf.mongodb.net
+if "%MONGODB_URI%"=="" (
+    echo ❌ Error: MONGODB_URI environment variable is not set!
+    echo.
+    echo 📋 Please set your MongoDB connection string:
+    echo    set MONGODB_URI="your_mongodb_connection_string_here"
+    echo.
+    echo 🔒 Security Note: Never hardcode database URLs in scripts!
+    echo    Use environment variables to keep credentials secure.
+    echo.
+    exit /b 1
+)
 
-echo 📊 Current MongoDB URI: %MONGODB_URI%
+echo 📊 MongoDB URI is set (connection string hidden for security)
 echo.
 
 REM Run the database index optimization
