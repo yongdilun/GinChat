@@ -415,9 +415,9 @@ func (s *MessageService) getUnreadAndRecentMessages(chatroomID primitive.ObjectI
 		return nil, false, nil, err
 	}
 
-	// Sort unread messages by sent_at (oldest first)
+	// Sort unread messages by sent_at (newest first for mobile display)
 	sort.Slice(unreadMessages, func(i, j int) bool {
-		return unreadMessages[i].SentAt.Before(unreadMessages[j].SentAt)
+		return unreadMessages[i].SentAt.After(unreadMessages[j].SentAt)
 	})
 
 	// Get some recent read messages to provide context (limit to 20)
@@ -454,9 +454,9 @@ func (s *MessageService) getUnreadAndRecentMessages(chatroomID primitive.ObjectI
 	// Combine read and unread messages
 	allMessages := append(readMessages, unreadMessages...)
 
-	// Sort all messages by sent_at (oldest first for proper chat order)
+	// Sort all messages by sent_at (newest first for mobile display)
 	sort.Slice(allMessages, func(i, j int) bool {
-		return allMessages[i].SentAt.Before(allMessages[j].SentAt)
+		return allMessages[i].SentAt.After(allMessages[j].SentAt)
 	})
 
 	// Check if there are more messages available
@@ -466,7 +466,8 @@ func (s *MessageService) getUnreadAndRecentMessages(chatroomID primitive.ObjectI
 	// Set next cursor to the oldest message timestamp if there are more
 	var nextCursor *string
 	if hasMore && len(allMessages) > 0 {
-		oldestTime := allMessages[0].SentAt.Format(time.RFC3339)
+		// Since messages are sorted newest first, the oldest is at the end
+		oldestTime := allMessages[len(allMessages)-1].SentAt.Format(time.RFC3339)
 		nextCursor = &oldestTime
 	}
 
@@ -512,15 +513,14 @@ func (s *MessageService) getPaginatedMessages(chatroomID primitive.ObjectID, lim
 		messages = messages[:limit] // Remove the extra message
 	}
 
-	// Reverse to get chronological order (oldest first)
-	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
-		messages[i], messages[j] = messages[j], messages[i]
-	}
+	// Messages are already in reverse chronological order (newest first) which is what we want
+	// No need to reverse since we want newest first for mobile display
 
 	// Set next cursor to the oldest message timestamp if there are more
 	var nextCursor *string
 	if hasMore && len(messages) > 0 {
-		oldestTime := messages[0].SentAt.Format(time.RFC3339)
+		// Since messages are sorted newest first, the oldest is at the end
+		oldestTime := messages[len(messages)-1].SentAt.Format(time.RFC3339)
 		nextCursor = &oldestTime
 	}
 
