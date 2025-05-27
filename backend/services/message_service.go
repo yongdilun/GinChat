@@ -545,3 +545,36 @@ func (s *MessageService) getPaginatedMessages(chatroomID primitive.ObjectID, lim
 
 	return messages, hasMore, nextCursor, nil
 }
+
+// GetChatroomMedia gets all media messages from a chatroom
+func (s *MessageService) GetChatroomMedia(chatroomID primitive.ObjectID) ([]models.Message, error) {
+	// Filter for messages that have media_url and are media types
+	filter := bson.M{
+		"chatroom_id": chatroomID,
+		"media_url":   bson.M{"$exists": true, "$ne": ""},
+		"message_type": bson.M{
+			"$in": []string{
+				"picture", "video", "audio",
+				"text_and_picture", "text_and_video", "text_and_audio",
+			},
+		},
+	}
+
+	// Sort by sent_at descending (newest first)
+	cursor, err := s.MsgColl.Find(
+		context.Background(),
+		filter,
+		options.Find().SetSort(bson.D{{Key: "sent_at", Value: -1}}),
+	)
+	if err != nil {
+		return nil, errors.New("failed to get media messages")
+	}
+	defer cursor.Close(context.Background())
+
+	var messages []models.Message
+	if err := cursor.All(context.Background(), &messages); err != nil {
+		return nil, errors.New("failed to decode media messages")
+	}
+
+	return messages, nil
+}

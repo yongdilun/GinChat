@@ -449,3 +449,81 @@ func (mc *MessageController) GetMessagesPaginated(c *gin.Context) {
 
 	c.JSON(http.StatusOK, response)
 }
+
+// GetChatroomMedia gets all media messages from a chatroom
+// @Summary Get all media messages from a chatroom
+// @Description Retrieves all messages with media (images, videos, audio) from a specific chatroom
+// @Tags messages
+// @Accept json
+// @Produce json
+// @Param chatroom_id path string true "Chatroom ID"
+// @Success 200 {object} map[string]interface{} "success"
+// @Failure 400 {object} map[string]interface{} "error"
+// @Failure 401 {object} map[string]interface{} "error"
+// @Failure 403 {object} map[string]interface{} "error"
+// @Failure 500 {object} map[string]interface{} "error"
+// @Router /chatrooms/{chatroom_id}/media [get]
+// @Security BearerAuth
+func (mc *MessageController) GetChatroomMedia(c *gin.Context) {
+	// Get chatroom ID from URL parameter
+	chatroomIDStr := c.Param("chatroom_id")
+	chatroomID, err := primitive.ObjectIDFromHex(chatroomIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chatroom ID"})
+		return
+	}
+
+	// Get user ID from JWT token
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	// Check if chatroom exists and user is a member
+	chatroom, err := mc.MessageService.ChatSvc.GetChatroomByID(chatroomID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Chatroom not found"})
+		return
+	}
+
+	// Check if user is a member of the chatroom
+	if !mc.MessageService.ChatSvc.IsMember(chatroom, userID.(uint)) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You are not a member of this chatroom"})
+		return
+	}
+
+	// Get all media messages from the chatroom
+	messages, err := mc.MessageService.GetChatroomMedia(chatroomID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get media messages"})
+		return
+	}
+
+	// Convert to response format
+	var messageResponses []models.MessageResponse
+	for _, message := range messages {
+		// Convert message to response format manually
+		response := message.ToResponse()
+
+		// Get read status for the message
+		if mc.MessageService.ReadStatusSvc != nil {
+			readStatus, err := mc.MessageService.ReadStatusSvc.GetMessageReadStatus(message.ID)
+			if err == nil {
+				response.ReadStatus = readStatus
+			}
+		}
+
+		messageResponses = append(messageResponses, response)
+	}
+
+	// Ensure messageResponses is never nil
+	if messageResponses == nil {
+		messageResponses = []models.MessageResponse{}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"messages": messageResponses,
+		"count":    len(messageResponses),
+	})
+}
