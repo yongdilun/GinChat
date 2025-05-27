@@ -63,3 +63,78 @@ func (c *Chatroom) CheckPassword(password string) bool {
 	}
 	return c.Password == password // Simple comparison for now
 }
+
+// ChatroomWithLatestMessage represents a chatroom with its latest message for efficient sorting
+type ChatroomWithLatestMessage struct {
+	ID            primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	Name          string             `bson:"name" json:"name"`
+	RoomCode      string             `bson:"room_code" json:"room_code"`
+	HasPassword   bool               `bson:"has_password" json:"has_password"`
+	CreatedBy     uint               `bson:"created_by" json:"created_by"`
+	CreatedAt     time.Time          `bson:"created_at" json:"created_at"`
+	Members       []ChatroomMember   `bson:"members" json:"members"`
+	LatestMessage *Message           `bson:"latest_message,omitempty" json:"latest_message,omitempty"`
+}
+
+// ChatroomWithLatestMessageResponse is the response format for sorted chatrooms
+type ChatroomWithLatestMessageResponse struct {
+	ID            string             `json:"id"`
+	Name          string             `json:"name"`
+	RoomCode      string             `json:"room_code"`
+	HasPassword   bool               `json:"has_password"`
+	CreatedBy     uint               `json:"created_by"`
+	CreatedAt     time.Time          `json:"created_at"`
+	Members       []ChatroomMember   `json:"members"`
+	LatestMessage *LatestMessageInfo `json:"last_message,omitempty"`
+}
+
+// LatestMessageInfo contains simplified latest message information
+type LatestMessageInfo struct {
+	Content    string    `json:"content"`
+	Timestamp  time.Time `json:"timestamp"`
+	SenderID   uint      `json:"sender_id"`
+	SenderName string    `json:"sender_name"`
+}
+
+// ToResponse converts ChatroomWithLatestMessage to response format
+func (c *ChatroomWithLatestMessage) ToResponse() ChatroomWithLatestMessageResponse {
+	response := ChatroomWithLatestMessageResponse{
+		ID:          c.ID.Hex(),
+		Name:        c.Name,
+		RoomCode:    c.RoomCode,
+		HasPassword: c.HasPassword,
+		CreatedBy:   c.CreatedBy,
+		CreatedAt:   c.CreatedAt,
+		Members:     c.Members,
+	}
+
+	// Add latest message info if available
+	if c.LatestMessage != nil {
+		content := c.LatestMessage.TextContent
+		if content == "" && c.LatestMessage.MediaURL != "" {
+			// Show media type if no text content
+			switch c.LatestMessage.MessageType {
+			case "picture", "text_and_picture":
+				content = "[Image]"
+			case "video", "text_and_video":
+				content = "[Video]"
+			case "audio", "text_and_audio":
+				content = "[Audio]"
+			default:
+				content = "[Media]"
+			}
+		}
+		if content == "" {
+			content = "New message"
+		}
+
+		response.LatestMessage = &LatestMessageInfo{
+			Content:    content,
+			Timestamp:  c.LatestMessage.SentAt,
+			SenderID:   c.LatestMessage.SenderID,
+			SenderName: c.LatestMessage.SenderName,
+		}
+	}
+
+	return response
+}

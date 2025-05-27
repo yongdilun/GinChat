@@ -1,6 +1,6 @@
 # GinChat Backend
 
-A robust real-time chat application backend built with Go, Gin framework, GORM, and MongoDB with comprehensive message read status tracking and blue tick system.
+A robust real-time chat application backend built with Go, Gin framework, GORM, and MongoDB with comprehensive message read status tracking and blue tick system. Serves both web and mobile clients with cross-platform synchronization.
 
 ## Tech Stack
 
@@ -58,6 +58,41 @@ backend/
 ├── go.sum              # Go module checksum
 └── main.go             # Entry point
 ```
+
+## Cross-Platform Integration
+
+This backend serves multiple client applications:
+- **Web Frontend**: React/Next.js application with responsive design
+- **Mobile App**: React Native with Expo for iOS and Android
+- **Shared Features**: Synchronized messaging, room management, and media handling
+- **Real-time Sync**: WebSocket connections work seamlessly across all platforms
+- **Consistent API**: Same endpoints serve both web and mobile clients
+
+## Recent Updates & Improvements
+
+### Enhanced WebSocket Architecture
+- **Cross-Platform Support**: WebSocket connections work seamlessly between web and mobile clients
+- **Improved Connection Management**: Better handling of room switching and disconnections
+- **Real-time Synchronization**: Messages and read status sync instantly across all platforms
+- **Robust Reconnection**: Enhanced auto-reconnection logic for network interruptions
+
+### Database Optimization
+- **Hosted Services**: Migrated to hosted MySQL (Aiven) and MongoDB (Atlas) for better reliability
+- **Environment Variables**: All database connections use environment variables for security
+- **Connection Pooling**: Optimized database connection management for better performance
+- **Index Optimization**: Added proper indexes for faster query performance
+
+### Media Handling Improvements
+- **Cloudinary Integration**: Secure cloud storage for all media files
+- **Automatic Cleanup**: Media files are automatically deleted when messages/chatrooms are removed
+- **Cross-Platform Access**: Media URLs work consistently across web and mobile
+- **Type Validation**: Enhanced media type validation and processing
+
+### Security Enhancements
+- **JWT Token Management**: Improved token validation and refresh mechanisms
+- **CORS Configuration**: Proper cross-origin resource sharing for web clients
+- **Rate Limiting**: Protection against API abuse and spam
+- **Input Validation**: Enhanced validation for all API endpoints
 
 ## Key Features
 

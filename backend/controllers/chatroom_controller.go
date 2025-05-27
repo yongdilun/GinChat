@@ -125,7 +125,7 @@ func (cc *ChatroomController) GetChatrooms(c *gin.Context) {
 	})
 }
 
-// GetChatroomsByUserID handles getting user's joined chatrooms
+// GetChatroomsByUserID handles getting user's joined chatrooms (legacy endpoint)
 // @Summary Get user's joined chatrooms
 // @Description Retrieve a list of chatrooms the authenticated user has joined
 // @Tags chatrooms
@@ -144,7 +144,29 @@ func (cc *ChatroomController) GetChatroomsByUserID(c *gin.Context) {
 		return
 	}
 
-	// Get user's joined chatrooms using the service
+	// Check if client wants sorted results
+	sorted := c.Query("sorted")
+	if sorted == "true" {
+		// Use optimized sorted method
+		chatrooms, err := cc.ChatroomService.GetUserChatroomsSortedByLatestMessage(userID.(uint))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Convert to response format
+		var response []any
+		for _, chatroom := range chatrooms {
+			response = append(response, chatroom.ToResponse())
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"chatrooms": response,
+		})
+		return
+	}
+
+	// Legacy method - get user's joined chatrooms using the service
 	chatrooms, err := cc.ChatroomService.GetUserChatrooms(userID.(uint))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

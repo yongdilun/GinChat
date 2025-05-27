@@ -142,6 +142,94 @@ func (s *ChatroomService) GetUserChatrooms(userID uint) ([]models.Chatroom, erro
 	return chatrooms, nil
 }
 
+// GetUserChatroomsSortedByLatestMessage retrieves user's chatrooms sorted by latest message timestamp
+func (s *ChatroomService) GetUserChatroomsSortedByLatestMessage(userID uint) ([]models.ChatroomWithLatestMessage, error) {
+	// Use MongoDB aggregation pipeline for efficient sorting
+	pipeline := []bson.M{
+		// Stage 1: Match chatrooms where user is a member
+		{
+			"$match": bson.M{
+				"members.user_id": userID,
+			},
+		},
+		// Stage 2: Lookup latest message for each chatroom
+		{
+			"$lookup": bson.M{
+				"from": "messages",
+				"let":  bson.M{"chatroom_id": "$_id"},
+				"pipeline": []bson.M{
+					{
+						"$match": bson.M{
+							"$expr": bson.M{
+								"$eq": []interface{}{"$chatroom_id", "$$chatroom_id"},
+							},
+						},
+					},
+					{
+						"$sort": bson.M{"sent_at": -1},
+					},
+					{
+						"$limit": 1,
+					},
+				},
+				"as": "latest_message",
+			},
+		},
+		// Stage 3: Add latest message timestamp for sorting
+		{
+			"$addFields": bson.M{
+				"latest_message_time": bson.M{
+					"$cond": bson.M{
+						"if": bson.M{"$gt": []interface{}{bson.M{"$size": "$latest_message"}, 0}},
+						"then": bson.M{
+							"$arrayElemAt": []interface{}{"$latest_message.sent_at", 0},
+						},
+						"else": "$created_at", // Use chatroom creation time if no messages
+					},
+				},
+			},
+		},
+		// Stage 4: Sort by latest message timestamp (descending)
+		{
+			"$sort": bson.M{"latest_message_time": -1},
+		},
+		// Stage 5: Project final structure
+		{
+			"$project": bson.M{
+				"_id":          1,
+				"name":         1,
+				"room_code":    1,
+				"has_password": 1,
+				"created_by":   1,
+				"created_at":   1,
+				"members":      1,
+				"latest_message": bson.M{
+					"$cond": bson.M{
+						"if": bson.M{"$gt": []interface{}{bson.M{"$size": "$latest_message"}, 0}},
+						"then": bson.M{
+							"$arrayElemAt": []interface{}{"$latest_message", 0},
+						},
+						"else": nil,
+					},
+				},
+			},
+		},
+	}
+
+	cursor, err := s.ChatColl.Aggregate(context.Background(), pipeline)
+	if err != nil {
+		return nil, errors.New("failed to aggregate user chatrooms")
+	}
+	defer cursor.Close(context.Background())
+
+	var results []models.ChatroomWithLatestMessage
+	if err := cursor.All(context.Background(), &results); err != nil {
+		return nil, errors.New("failed to decode chatroom results")
+	}
+
+	return results, nil
+}
+
 // GetChatroomByID retrieves a chatroom by ID
 func (s *ChatroomService) GetChatroomByID(chatroomID primitive.ObjectID) (*models.Chatroom, error) {
 	var chatroom models.Chatroom

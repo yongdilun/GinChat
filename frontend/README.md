@@ -1,6 +1,6 @@
-# GinChat Frontend
+# GinChat Web Frontend
 
-A modern real-time chat application frontend built with React, Next.js, TypeScript, and Tailwind CSS with comprehensive message read status tracking and blue tick system.
+A modern real-time chat application web frontend built with React, Next.js, TypeScript, and Tailwind CSS. Part of the cross-platform GinChat ecosystem with comprehensive message read status tracking and blue tick system.
 
 ## Tech Stack
 
@@ -317,16 +317,28 @@ The frontend expects the backend to be running on `http://localhost:8080` by def
 
 The application checks for backend availability using the `/health` endpoint.
 
+## Cross-Platform Integration
+
+This web frontend is part of the GinChat ecosystem that includes:
+- **Web Application**: This React/Next.js frontend for desktop and mobile browsers
+- **Mobile Application**: React Native app with Expo for iOS and Android
+- **Backend API**: Go/Gin server with MySQL and MongoDB
+- **Shared Features**: Cross-platform room sharing, synchronized messaging, and consistent UI/UX
+
 ## Recent Updates & Improvements
 
-### Fixed Unread Label & Navigation Logic (Latest)
-- **Fixed Unread Label Logic**: Unread labels now only appear on recipient's messages, never on sender's own messages
-- **Static Unread Positioning**: Unread labels stay fixed when entering chat and aren't affected by real-time read status updates
-- **Direct Navigation**: Replaced slow scrolling animations with instant direct positioning for better UX
-- **Instant Chat Navigation**: When entering chatrooms, directly positions at unread messages without visible scrolling
-- **Fast Message Sending**: New messages navigate instantly to bottom without scrolling from top
-- **Performance Optimization**: Reduced navigation delays from 300-500ms to 50-200ms for responsive interface
-- **Professional Navigation**: WhatsApp-like instant positioning instead of slow scroll animations
+### Navigation Spam Prevention (Latest)
+- **Debounced Navigation**: Prevents multiple chat pages from opening when users rapidly tap chat items
+- **Visual Feedback**: Chat items show disabled state during navigation with opacity changes
+- **2-Second Cooldown**: Prevents rapid navigation attempts with proper timeout management
+- **Error Recovery**: Immediate reset on navigation errors for smooth user experience
+- **Consistent Gradients**: Fixed group icon gradients to be consistent across app sessions
+
+### Enhanced Message Display
+- **Username in Previews**: Latest message previews now show "Username: message" format
+- **Improved Context**: Better understanding of conversation flow in chat list
+- **Consistent Formatting**: "You: message" for own messages, "Username: message" for others
+- **Media Type Support**: Proper display of different message types in previews
 
 ### Real-time Read Status Fix & Testing (Previous)
 - **Fixed Real-time Updates**: Resolved issue where grey/blue ticks weren't updating in real-time
