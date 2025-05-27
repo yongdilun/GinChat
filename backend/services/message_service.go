@@ -232,6 +232,11 @@ func (s *MessageService) GetMessagesPaginated(chatroomID primitive.ObjectID, use
 		messageResponses = append(messageResponses, response)
 	}
 
+	// Ensure messageResponses is never nil
+	if messageResponses == nil {
+		messageResponses = []models.MessageResponse{}
+	}
+
 	return &PaginatedMessagesResponse{
 		Messages:    messageResponses,
 		HasMore:     hasMore,
