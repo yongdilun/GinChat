@@ -84,16 +84,14 @@ const MessageList: React.FC<MessageListProps> = ({
           if (lastMessage.data) {
             const data = lastMessage.data as { message_id?: string; read_status?: ReadInfo[]; user_id?: number };
             if (data.message_id && data.read_status) {
-              // Only update if this is not the current user (to avoid duplicate updates)
-              if (data.user_id !== user?.user_id) {
-                console.log(`📡 WebSocket read status update for message ${data.message_id}`);
+              // FIXED: Always process WebSocket read status updates
+              // The user_id in the data is the user who READ the message, not who sent it
+              // We want to see when others read our messages (blue ticks)
+              console.log(`📡 WebSocket read status update for message ${data.message_id} (reader: ${data.user_id})`);
 
-                if (onMessageReadStatusUpdate) {
-                  onMessageReadStatusUpdate(data.message_id, data.read_status);
-                  console.log(`✅ Updated from WebSocket:`, data.read_status);
-                }
-              } else {
-                console.log(`⏭️ Skipping WebSocket update for current user (already updated optimistically)`);
+              if (onMessageReadStatusUpdate) {
+                onMessageReadStatusUpdate(data.message_id, data.read_status);
+                console.log(`✅ Updated from WebSocket:`, data.read_status);
               }
             }
           }
