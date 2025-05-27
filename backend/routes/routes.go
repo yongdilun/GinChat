@@ -70,7 +70,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, mongodb *mongo.Database, logger *lo
 			// Message routes
 			protected.GET("/chatrooms/:id/messages", messageController.GetMessages)
 			protected.GET("/chatrooms/:id/messages/paginated", messageController.GetMessagesPaginated) // New paginated endpoint for mobile
-			protected.GET("/chatrooms/:chatroom_id/media", messageController.GetChatroomMedia)         // New endpoint to get all media from chatroom
+			protected.GET("/chatrooms/:id/media", messageController.GetChatroomMedia)                  // New endpoint to get all media from chatroom
 			protected.POST("/chatrooms/:id/messages", messageController.SendMessage)
 			protected.PUT("/chatrooms/:id/messages/:messageId", messageController.UpdateMessage)
 			protected.DELETE("/chatrooms/:id/messages/:messageId", messageController.DeleteMessage)

@@ -456,17 +456,17 @@ func (mc *MessageController) GetMessagesPaginated(c *gin.Context) {
 // @Tags messages
 // @Accept json
 // @Produce json
-// @Param chatroom_id path string true "Chatroom ID"
+// @Param id path string true "Chatroom ID"
 // @Success 200 {object} map[string]interface{} "success"
 // @Failure 400 {object} map[string]interface{} "error"
 // @Failure 401 {object} map[string]interface{} "error"
 // @Failure 403 {object} map[string]interface{} "error"
 // @Failure 500 {object} map[string]interface{} "error"
-// @Router /chatrooms/{chatroom_id}/media [get]
+// @Router /chatrooms/{id}/media [get]
 // @Security BearerAuth
 func (mc *MessageController) GetChatroomMedia(c *gin.Context) {
 	// Get chatroom ID from URL parameter
-	chatroomIDStr := c.Param("chatroom_id")
+	chatroomIDStr := c.Param("id")
 	chatroomID, err := primitive.ObjectIDFromHex(chatroomIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chatroom ID"})
