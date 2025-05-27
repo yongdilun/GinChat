@@ -475,3 +475,70 @@ func (c *MessageReadStatusController) GetUnreadCountForChatroom(ctx *gin.Context
 
 	ctx.JSON(http.StatusOK, gin.H{"unread_count": count})
 }
+
+// MarkSingleMessageAsRead marks a single message as read for the authenticated user via URL parameter
+// @Summary Mark a single message as read via URL
+// @Description Marks a specific message as read for the authenticated user (used for auto-read via WebSocket)
+// @Tags message-read-status
+// @Produce json
+// @Security ApiKeyAuth
+// @Param message_id path string true "Message ID"
+// @Success 200 {object} map[string]interface{} "success"
+// @Failure 400 {object} map[string]string "Invalid message ID"
+// @Failure 401 {object} map[string]string "User not authenticated"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /messages/{message_id}/mark-read [post]
+func (c *MessageReadStatusController) MarkSingleMessageAsRead(ctx *gin.Context) {
+	// Get message ID from URL parameter
+	messageIDStr := ctx.Param("message_id")
+	messageID, err := primitive.ObjectIDFromHex(messageIDStr)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
+		return
+	}
+
+	// Get user ID from context (set by auth middleware)
+	userID, exists := ctx.Get("user_id")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	// Mark the message as read using the optimized method
+	chatroomID, err := c.ReadStatusService.MarkMessageAsReadOptimized(messageID, userID.(uint))
+	if err != nil {
+		if err.Error() == "read status not found" {
+			ctx.JSON(http.StatusNotFound, gin.H{"error": "Message not found or already read"})
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": utils.FormatServiceError(err)})
+		return
+	}
+
+	// Return success immediately for better performance
+	ctx.JSON(http.StatusOK, gin.H{
+		"message":    "Message marked as read successfully",
+		"message_id": messageID.Hex(),
+		"user_id":    userID.(uint),
+	})
+
+	// Handle WebSocket notifications asynchronously (non-blocking)
+	go func() {
+		// Get updated read status and broadcast
+		readStatus, err := c.ReadStatusService.GetMessageReadStatus(messageID)
+		if err == nil {
+			// Broadcast read status update with user_id for filtering
+			BroadcastMessageReadGlobal(chatroomID.Hex(), map[string]any{
+				"message_id":  messageID.Hex(),
+				"read_status": readStatus,
+				"user_id":     userID.(uint),
+			})
+		}
+
+		// Update unread counts for current user only (more efficient)
+		unreadCounts, err := c.ReadStatusService.GetUnreadCountForUser(userID.(uint))
+		if err == nil {
+			BroadcastUnreadCountUpdateGlobal(userID.(uint), unreadCounts)
+		}
+	}()
+}

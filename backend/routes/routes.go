@@ -80,6 +80,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, mongodb *mongo.Database, logger *lo
 				services.NewMessageReadStatusService(mongodb, services.NewChatroomService(mongodb), services.NewUserService(db)),
 			)
 			protected.POST("/messages/read", messageReadStatusController.MarkMessageAsRead)
+			protected.POST("/messages/:message_id/mark-read", messageReadStatusController.MarkSingleMessageAsRead) // New endpoint for auto-read via WebSocket
 			protected.POST("/messages/read-multiple", messageReadStatusController.MarkMultipleMessagesAsRead)
 			protected.GET("/messages/unread-counts", messageReadStatusController.GetUnreadCountForUser)
 			protected.GET("/messages/latest", messageReadStatusController.GetLatestMessagesForChatrooms)
