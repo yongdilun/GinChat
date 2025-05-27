@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"sort"
 	"strings"
 	"time"
 
@@ -159,6 +160,84 @@ func (s *MessageService) GetMessagesWithReadStatus(chatroomID primitive.ObjectID
 	}
 
 	return messageResponses, nil
+}
+
+// PaginatedMessagesResponse represents the response for paginated messages
+type PaginatedMessagesResponse struct {
+	Messages    []models.MessageResponse `json:"messages"`              // List of messages
+	HasMore     bool                     `json:"has_more"`              // Whether there are more messages available
+	NextCursor  *string                  `json:"next_cursor,omitempty"` // Cursor for next page (timestamp)
+	UnreadCount int                      `json:"unread_count"`          // Total unread messages for this user in this chatroom
+	TotalCount  int                      `json:"total_count"`           // Total messages in chatroom
+}
+
+// GetMessagesPaginated retrieves messages with smart pagination for mobile
+func (s *MessageService) GetMessagesPaginated(chatroomID primitive.ObjectID, userID uint, limit int, beforeTime, afterTime *time.Time) (*PaginatedMessagesResponse, error) {
+	// Check if chatroom exists and user is a member
+	chatroom, err := s.ChatSvc.GetChatroomByID(chatroomID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if user is a member of the chatroom
+	if !s.ChatSvc.IsMember(chatroom, userID) {
+		return nil, errors.New("user is not a member of this chatroom")
+	}
+
+	// Get unread count for this user in this chatroom
+	unreadCount := 0
+	if s.ReadStatusSvc != nil {
+		count, _ := s.ReadStatusSvc.GetUnreadCountForChatroom(chatroomID, userID)
+		unreadCount = int(count)
+	}
+
+	// Get total message count in chatroom
+	totalCount, err := s.MsgColl.CountDocuments(context.Background(), bson.M{"chatroom_id": chatroomID})
+	if err != nil {
+		totalCount = 0
+	}
+
+	var messages []models.Message
+	var hasMore bool
+	var nextCursor *string
+
+	// Smart loading logic: if unread > 50, load all unread messages + some read ones
+	// Otherwise, load the standard 50 messages
+	if unreadCount > 50 && beforeTime == nil && afterTime == nil {
+		// Load all unread messages plus some recent read messages
+		messages, hasMore, nextCursor, err = s.getUnreadAndRecentMessages(chatroomID, userID)
+	} else {
+		// Standard pagination
+		messages, hasMore, nextCursor, err = s.getPaginatedMessages(chatroomID, limit, beforeTime, afterTime)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to response format with read status
+	var messageResponses []models.MessageResponse
+	for _, message := range messages {
+		response := message.ToResponse()
+
+		// Get read status for this message if read status service is available
+		if s.ReadStatusSvc != nil {
+			readStatus, err := s.ReadStatusSvc.GetMessageReadStatus(message.ID)
+			if err == nil {
+				response.ReadStatus = readStatus
+			}
+		}
+
+		messageResponses = append(messageResponses, response)
+	}
+
+	return &PaginatedMessagesResponse{
+		Messages:    messageResponses,
+		HasMore:     hasMore,
+		NextCursor:  nextCursor,
+		UnreadCount: unreadCount,
+		TotalCount:  int(totalCount),
+	}, nil
 }
 
 // DeleteMessage deletes a message and its associated media
@@ -326,4 +405,124 @@ func (s *MessageService) DeleteAllMessagesInChatroom(chatroomID primitive.Object
 	}
 
 	return nil
+}
+
+// getUnreadAndRecentMessages loads all unread messages plus some recent read messages
+func (s *MessageService) getUnreadAndRecentMessages(chatroomID primitive.ObjectID, userID uint) ([]models.Message, bool, *string, error) {
+	// Get all unread messages for this user
+	unreadMessages, err := s.ReadStatusSvc.GetUnreadMessagesInChatroom(chatroomID, userID)
+	if err != nil {
+		return nil, false, nil, err
+	}
+
+	// Sort unread messages by sent_at (oldest first)
+	sort.Slice(unreadMessages, func(i, j int) bool {
+		return unreadMessages[i].SentAt.Before(unreadMessages[j].SentAt)
+	})
+
+	// Get some recent read messages to provide context (limit to 20)
+	readLimit := 20
+	filter := bson.M{
+		"chatroom_id": chatroomID,
+		"_id": bson.M{
+			"$nin": func() []primitive.ObjectID {
+				var unreadIDs []primitive.ObjectID
+				for _, msg := range unreadMessages {
+					unreadIDs = append(unreadIDs, msg.ID)
+				}
+				return unreadIDs
+			}(),
+		},
+	}
+
+	// Get recent read messages (newest first, then we'll reverse)
+	cursor, err := s.MsgColl.Find(
+		context.Background(),
+		filter,
+		options.Find().SetSort(bson.D{{Key: "sent_at", Value: -1}}).SetLimit(int64(readLimit)),
+	)
+	if err != nil {
+		return nil, false, nil, errors.New("failed to get read messages")
+	}
+	defer cursor.Close(context.Background())
+
+	var readMessages []models.Message
+	if err := cursor.All(context.Background(), &readMessages); err != nil {
+		return nil, false, nil, errors.New("failed to decode read messages")
+	}
+
+	// Combine read and unread messages
+	allMessages := append(readMessages, unreadMessages...)
+
+	// Sort all messages by sent_at (oldest first for proper chat order)
+	sort.Slice(allMessages, func(i, j int) bool {
+		return allMessages[i].SentAt.Before(allMessages[j].SentAt)
+	})
+
+	// Check if there are more messages available
+	totalMessages, _ := s.MsgColl.CountDocuments(context.Background(), bson.M{"chatroom_id": chatroomID})
+	hasMore := int64(len(allMessages)) < totalMessages
+
+	// Set next cursor to the oldest message timestamp if there are more
+	var nextCursor *string
+	if hasMore && len(allMessages) > 0 {
+		oldestTime := allMessages[0].SentAt.Format(time.RFC3339)
+		nextCursor = &oldestTime
+	}
+
+	return allMessages, hasMore, nextCursor, nil
+}
+
+// getPaginatedMessages gets messages with standard pagination
+func (s *MessageService) getPaginatedMessages(chatroomID primitive.ObjectID, limit int, beforeTime, afterTime *time.Time) ([]models.Message, bool, *string, error) {
+	// Build filter
+	filter := bson.M{"chatroom_id": chatroomID}
+
+	// Add time-based filters
+	if beforeTime != nil {
+		filter["sent_at"] = bson.M{"$lt": *beforeTime}
+	}
+	if afterTime != nil {
+		if filter["sent_at"] != nil {
+			filter["sent_at"].(bson.M)["$gt"] = *afterTime
+		} else {
+			filter["sent_at"] = bson.M{"$gt": *afterTime}
+		}
+	}
+
+	// Get messages (newest first, then we'll reverse for chat order)
+	cursor, err := s.MsgColl.Find(
+		context.Background(),
+		filter,
+		options.Find().SetSort(bson.D{{Key: "sent_at", Value: -1}}).SetLimit(int64(limit+1)), // +1 to check if there are more
+	)
+	if err != nil {
+		return nil, false, nil, errors.New("failed to get messages")
+	}
+	defer cursor.Close(context.Background())
+
+	var messages []models.Message
+	if err := cursor.All(context.Background(), &messages); err != nil {
+		return nil, false, nil, errors.New("failed to decode messages")
+	}
+
+	// Check if there are more messages
+	hasMore := len(messages) > limit
+	if hasMore {
+		messages = messages[:limit] // Remove the extra message
+	}
+
+	// Reverse to get chronological order (oldest first)
+	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
+		messages[i], messages[j] = messages[j], messages[i]
+	}
+
+	// Set next cursor to the oldest message timestamp if there are more
+	var nextCursor *string
+	if hasMore && len(messages) > 0 {
+		oldestTime := messages[0].SentAt.Format(time.RFC3339)
+		nextCursor = &oldestTime
+	}
+
+	return messages, hasMore, nextCursor, nil
 }

@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ginchat/models"
 	"github.com/ginchat/services"
 	"github.com/ginchat/utils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -346,4 +348,104 @@ func (mc *MessageController) DeleteMessage(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Message deleted successfully"})
+}
+
+// PaginatedMessagesRequest represents the request for paginated messages
+type PaginatedMessagesRequest struct {
+	Limit  int    `form:"limit" json:"limit" example:"50"`                     // Number of messages to retrieve (default: 50)
+	Before string `form:"before" json:"before" example:"2024-01-01T12:00:00Z"` // Get messages before this timestamp (for pagination)
+	After  string `form:"after" json:"after" example:"2024-01-01T12:00:00Z"`   // Get messages after this timestamp (for pagination)
+}
+
+// PaginatedMessagesResponse represents the response for paginated messages
+type PaginatedMessagesResponse struct {
+	Messages    []models.MessageResponse `json:"messages"`              // List of messages
+	HasMore     bool                     `json:"has_more"`              // Whether there are more messages available
+	NextCursor  *string                  `json:"next_cursor,omitempty"` // Cursor for next page (timestamp)
+	UnreadCount int                      `json:"unread_count"`          // Total unread messages for this user in this chatroom
+	TotalCount  int                      `json:"total_count"`           // Total messages in chatroom
+}
+
+// GetMessagesPaginated handles getting paginated messages from a chatroom for mobile
+// @Summary Get paginated messages from a chatroom (Mobile optimized)
+// @Description Retrieve messages with smart pagination - loads 50 initially, or all unread if >50 unread messages
+// @Tags messages
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Param id path string true "Chatroom ID" example:"60d5f8b8e6b5f0b3e8b4b5b3"
+// @Param limit query int false "Maximum number of messages to retrieve" default(50) minimum(1) maximum(100)
+// @Param before query string false "Get messages before this timestamp (ISO 8601)" example:"2024-01-01T12:00:00Z"
+// @Param after query string false "Get messages after this timestamp (ISO 8601)" example:"2024-01-01T12:00:00Z"
+// @Success 200 {object} PaginatedMessagesResponse "Paginated messages with metadata"
+// @Failure 400 {object} map[string]string "Invalid request parameters"
+// @Failure 401 {object} map[string]string "User not authenticated"
+// @Failure 403 {object} map[string]string "User is not a member of this chatroom"
+// @Failure 404 {object} map[string]string "Chatroom not found"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /chatrooms/{id}/messages/paginated [get]
+func (mc *MessageController) GetMessagesPaginated(c *gin.Context) {
+	// Get chatroom ID from URL
+	chatroomID, err := primitive.ObjectIDFromHex(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chatroom ID"})
+		return
+	}
+
+	// Get user ID from context (set by auth middleware)
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	// Parse query parameters
+	var req PaginatedMessagesRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": utils.FormatValidationError(err)})
+		return
+	}
+
+	// Set default limit
+	if req.Limit <= 0 {
+		req.Limit = 50
+	}
+	if req.Limit > 100 {
+		req.Limit = 100
+	}
+
+	// Parse timestamps if provided
+	var beforeTime, afterTime *time.Time
+	if req.Before != "" {
+		if t, err := time.Parse(time.RFC3339, req.Before); err == nil {
+			beforeTime = &t
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'before' timestamp format. Use ISO 8601 format."})
+			return
+		}
+	}
+	if req.After != "" {
+		if t, err := time.Parse(time.RFC3339, req.After); err == nil {
+			afterTime = &t
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'after' timestamp format. Use ISO 8601 format."})
+			return
+		}
+	}
+
+	// Get paginated messages using the service
+	response, err := mc.MessageService.GetMessagesPaginated(chatroomID, userID.(uint), req.Limit, beforeTime, afterTime)
+	if err != nil {
+		switch err.Error() {
+		case "chatroom not found":
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		case "user is not a member of this chatroom":
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
 }
