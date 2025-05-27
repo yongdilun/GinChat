@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -491,17 +492,11 @@ func (s *MessageService) getPaginatedMessages(chatroomID primitive.ObjectID, lim
 		}
 	}
 
-	// Get total count of messages matching the filter to determine if there are more
-	totalMatchingCount, err := s.MsgColl.CountDocuments(context.Background(), filter)
-	if err != nil {
-		return nil, false, nil, errors.New("failed to count messages")
-	}
-
-	// Get messages (newest first, then we'll reverse for chat order)
+	// Get messages (newest first) - request limit+1 to check if there are more
 	cursor, err := s.MsgColl.Find(
 		context.Background(),
 		filter,
-		options.Find().SetSort(bson.D{{Key: "sent_at", Value: -1}}).SetLimit(int64(limit)),
+		options.Find().SetSort(bson.D{{Key: "sent_at", Value: -1}}).SetLimit(int64(limit+1)),
 	)
 	if err != nil {
 		return nil, false, nil, errors.New("failed to get messages")
@@ -513,8 +508,24 @@ func (s *MessageService) getPaginatedMessages(chatroomID primitive.ObjectID, lim
 		return nil, false, nil, errors.New("failed to decode messages")
 	}
 
-	// Check if there are more messages by comparing the count we got vs total available
-	hasMore := int64(len(messages)) < totalMatchingCount
+	// Check if there are more messages by seeing if we got more than requested
+	hasMore := len(messages) > limit
+	if hasMore {
+		// Remove the extra message we requested to check for more
+		messages = messages[:limit]
+	}
+
+	// If we're paginating (beforeTime is set) and got fewer messages than requested,
+	// it means we've reached the beginning of the conversation
+	if beforeTime != nil && len(messages) < limit {
+		hasMore = false
+	}
+
+	// Log pagination details for debugging
+	if beforeTime != nil {
+		fmt.Printf("[MessageService] Pagination: beforeTime=%v, requested=%d, got=%d, hasMore=%v\n",
+			beforeTime.Format(time.RFC3339), limit, len(messages), hasMore)
+	}
 
 	// Messages are already in reverse chronological order (newest first) which is what we want
 	// No need to reverse since we want newest first for mobile display
