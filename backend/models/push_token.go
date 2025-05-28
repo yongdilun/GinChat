@@ -10,16 +10,13 @@ import (
 // PushToken represents a push notification token for a user
 type PushToken struct {
 	ID         uint            `json:"id" gorm:"primaryKey"`
-	UserID     uint            `json:"user_id" gorm:"not null;index"`
+	UserID     uint            `json:"user_id" gorm:"not null;index;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 	Token      string          `json:"token" gorm:"not null;unique;size:255"`
 	Platform   string          `json:"platform" gorm:"not null;size:20"`
 	DeviceInfo json.RawMessage `json:"device_info" gorm:"type:json"`
 	IsActive   bool            `json:"is_active" gorm:"default:true;index"`
 	CreatedAt  time.Time       `json:"created_at"`
 	UpdatedAt  time.Time       `json:"updated_at"`
-
-	// Associations
-	User User `json:"user" gorm:"foreignKey:UserID"`
 }
 
 // DeviceInfo represents device information for push tokens

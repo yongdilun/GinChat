@@ -225,11 +225,21 @@ func setupRouter() *gin.Engine {
 func initDatabase() {
 	// Auto migrate MySQL models
 	if mysqlDB != nil {
-		err := mysqlDB.AutoMigrate(&models.User{}, &models.PushToken{})
+		// Migrate User model first
+		err := mysqlDB.AutoMigrate(&models.User{})
 		if err != nil {
-			logger.Fatalf("Failed to migrate MySQL models: %v", err)
+			logger.Fatalf("Failed to migrate User model: %v", err)
 		}
-		logger.Info("MySQL models migrated successfully")
+		logger.Info("User model migrated successfully")
+
+		// Then migrate PushToken model
+		err = mysqlDB.AutoMigrate(&models.PushToken{})
+		if err != nil {
+			logger.Fatalf("Failed to migrate PushToken model: %v", err)
+		}
+		logger.Info("PushToken model migrated successfully")
+
+		logger.Info("All MySQL models migrated successfully")
 	}
 }
 
