@@ -28,6 +28,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, mongodb *mongo.Database, logger *lo
 	// Use the messageService when the MessageController is updated to accept it
 	// messageController := controllers.NewMessageController(db, messageService)
 	websocketController := controllers.NewWebSocketController(logger)
+	pushTokenController := controllers.NewPushTokenController(db)
 
 	// Create media controller with Cloudinary
 	mediaController := controllers.NewMediaController()
@@ -57,6 +58,11 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, mongodb *mongo.Database, logger *lo
 		{
 			// User routes
 			protected.POST("/auth/logout", userController.Logout)
+
+			// Push token routes
+			protected.POST("/auth/push-token", pushTokenController.RegisterPushToken)
+			protected.PUT("/auth/push-token", pushTokenController.UpdatePushToken)
+			protected.DELETE("/auth/push-token", pushTokenController.RemovePushToken)
 
 			// Chatroom routes
 			protected.GET("/chatrooms", chatroomController.GetChatrooms)

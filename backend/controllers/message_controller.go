@@ -17,7 +17,8 @@ import (
 
 // MessageController handles message-related requests
 type MessageController struct {
-	MessageService *services.MessageService
+	MessageService          *services.MessageService
+	PushNotificationService *services.PushNotificationService
 }
 
 // NewMessageController creates a new MessageController
@@ -27,8 +28,10 @@ func NewMessageController(db *gorm.DB, mongodb *mongo.Database) *MessageControll
 	cloudinaryService, _ := services.NewCloudinaryService() // Ignore error for now, will be nil if not configured
 	readStatusService := services.NewMessageReadStatusService(mongodb, chatroomService, userService)
 	messageService := services.NewMessageService(mongodb, chatroomService, cloudinaryService, readStatusService)
+	pushNotificationService := services.NewPushNotificationService(db)
 	return &MessageController{
-		MessageService: messageService,
+		MessageService:          messageService,
+		PushNotificationService: pushNotificationService,
 	}
 }
 
@@ -149,6 +152,46 @@ func (mc *MessageController) SendMessage(c *gin.Context) {
 		}
 	} else {
 		fmt.Println("Warning: GlobalWebSocketController is nil, cannot broadcast message")
+	}
+
+	// Send push notification in background
+	if mc.PushNotificationService != nil {
+		go func() {
+			// Get chatroom for notification
+			chatroom, err := mc.MessageService.ChatSvc.GetChatroomByID(chatroomID)
+			if err != nil {
+				fmt.Printf("Failed to get chatroom for push notification: %v\n", err)
+				return
+			}
+
+			// Prepare message content for notification
+			messageContent := req.TextContent
+			if messageContent == "" {
+				// For media messages without text, use a generic message
+				switch req.MessageType {
+				case "picture":
+					messageContent = "📷 Photo"
+				case "audio":
+					messageContent = "🎵 Audio"
+				case "video":
+					messageContent = "🎥 Video"
+				default:
+					messageContent = "📎 Media"
+				}
+			}
+
+			// Send notification
+			err = mc.PushNotificationService.SendMessageNotification(
+				chatroomID.Hex(),
+				userID.(uint),
+				username.(string),
+				messageContent,
+				chatroom.Name,
+			)
+			if err != nil {
+				fmt.Printf("Failed to send push notification: %v\n", err)
+			}
+		}()
 	}
 
 	// Return message data
