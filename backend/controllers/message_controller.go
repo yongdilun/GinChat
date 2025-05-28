@@ -155,7 +155,9 @@ func (mc *MessageController) SendMessage(c *gin.Context) {
 	}
 
 	// Send push notification in background
+	fmt.Printf("DEBUG: PushNotificationService is nil: %v\n", mc.PushNotificationService == nil)
 	if mc.PushNotificationService != nil {
+		fmt.Printf("DEBUG: Starting push notification goroutine for message in chatroom %s\n", chatroomID.Hex())
 		go func() {
 			// Get chatroom for notification
 			chatroom, err := mc.MessageService.ChatSvc.GetChatroomByID(chatroomID)
@@ -180,6 +182,9 @@ func (mc *MessageController) SendMessage(c *gin.Context) {
 				}
 			}
 
+			fmt.Printf("DEBUG: Sending push notification for chatroom %s, sender %d, content: %s\n",
+				chatroomID.Hex(), userID.(uint), messageContent)
+
 			// Send notification
 			err = mc.PushNotificationService.SendMessageNotification(
 				chatroomID.Hex(),
@@ -190,8 +195,12 @@ func (mc *MessageController) SendMessage(c *gin.Context) {
 			)
 			if err != nil {
 				fmt.Printf("Failed to send push notification: %v\n", err)
+			} else {
+				fmt.Printf("Push notification sent successfully for chatroom %s\n", chatroomID.Hex())
 			}
 		}()
+	} else {
+		fmt.Printf("DEBUG: PushNotificationService is nil, skipping push notification\n")
 	}
 
 	// Return message data
