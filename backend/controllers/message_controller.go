@@ -28,7 +28,7 @@ func NewMessageController(db *gorm.DB, mongodb *mongo.Database) *MessageControll
 	cloudinaryService, _ := services.NewCloudinaryService() // Ignore error for now, will be nil if not configured
 	readStatusService := services.NewMessageReadStatusService(mongodb, chatroomService, userService)
 	messageService := services.NewMessageService(mongodb, chatroomService, cloudinaryService, readStatusService)
-	pushNotificationService := services.NewPushNotificationService(db)
+	pushNotificationService := services.NewPushNotificationService(db, mongodb)
 	return &MessageController{
 		MessageService:          messageService,
 		PushNotificationService: pushNotificationService,

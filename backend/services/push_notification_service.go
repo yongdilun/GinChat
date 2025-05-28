@@ -2,19 +2,24 @@ package services
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/ginchat/models"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 
 	"gorm.io/gorm"
 )
 
 // PushNotificationService handles push notification operations
 type PushNotificationService struct {
-	db *gorm.DB
+	db      *gorm.DB
+	mongodb *mongo.Database
 }
 
 // ExpoMessage represents the structure for Expo push notifications
@@ -41,8 +46,11 @@ type ExpoResponse struct {
 }
 
 // NewPushNotificationService creates a new PushNotificationService
-func NewPushNotificationService(db *gorm.DB) *PushNotificationService {
-	return &PushNotificationService{db: db}
+func NewPushNotificationService(db *gorm.DB, mongodb *mongo.Database) *PushNotificationService {
+	return &PushNotificationService{
+		db:      db,
+		mongodb: mongodb,
+	}
 }
 
 // SendMessageNotification sends a push notification for a new message
@@ -53,20 +61,29 @@ func (s *PushNotificationService) SendMessageNotification(
 	messageContent string,
 	chatroomName string,
 ) error {
-	// Get all active users in the chatroom except the sender
-	var members []models.ChatroomMember
-	if err := s.db.Where("chatroom_id = ? AND user_id != ?", chatroomID, senderID).Find(&members).Error; err != nil {
-		return fmt.Errorf("failed to get chatroom members: %w", err)
+	// Convert chatroomID string to ObjectID
+	objID, err := primitive.ObjectIDFromHex(chatroomID)
+	if err != nil {
+		return fmt.Errorf("invalid chatroom ID: %w", err)
 	}
 
-	if len(members) == 0 {
-		return nil // No members to notify
+	// Get chatroom from MongoDB to get members
+	var chatroom models.Chatroom
+	err = s.mongodb.Collection("chatrooms").FindOne(context.Background(), bson.M{"_id": objID}).Decode(&chatroom)
+	if err != nil {
+		return fmt.Errorf("failed to get chatroom: %w", err)
 	}
 
-	// Get user IDs
+	// Get all members except the sender
 	var userIDs []uint
-	for _, member := range members {
-		userIDs = append(userIDs, member.UserID)
+	for _, member := range chatroom.Members {
+		if member.UserID != senderID {
+			userIDs = append(userIDs, member.UserID)
+		}
+	}
+
+	if len(userIDs) == 0 {
+		return nil // No members to notify
 	}
 
 	// Get active push tokens for these users
