@@ -50,7 +50,8 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, mongodb *mongo.Database, logger *lo
 		{
 			auth.POST("/register", userController.Register)
 			auth.POST("/login", userController.Login)
-			auth.POST("/force-logout", userController.ForceLogout) // For handling multiple device login
+			auth.POST("/force-logout", userController.ForceLogout)            // For handling multiple device login
+			auth.POST("/test-token", pushTokenController.TestTokenValidation) // Temporary test endpoint
 		}
 
 		// Protected routes (auth required)

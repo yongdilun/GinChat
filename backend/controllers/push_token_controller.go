@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/ginchat/models"
@@ -63,49 +62,18 @@ func (ptc *PushTokenController) RegisterPushToken(c *gin.Context) {
 	// Debug: Log the registration attempt with more details
 	log.Printf("DEBUG: Push token registration attempt - User ID: %v, Token length: %d, Platform: %s",
 		userID, len(req.Token), req.Platform)
-	log.Printf("DEBUG: Token preview: %s...", req.Token[:min(50, len(req.Token))])
+	log.Printf("DEBUG: Full token received: %s", req.Token)
+	log.Printf("DEBUG: Token is empty: %t", req.Token == "")
+	log.Printf("DEBUG: Token is null/undefined: %t", req.Token == "null" || req.Token == "undefined")
 
-	// FIXED: Only check for the correct Expo token format
-	if !strings.HasPrefix(req.Token, "ExponentPushToken[") {
-		log.Printf("DEBUG: Invalid token format for user %d. Expected 'ExponentPushToken[' prefix, got: %s...", 
-			userID.(uint), req.Token[:min(50, len(req.Token))])
+	// Simplified validation - only check basic Expo token format
+	if err := validateBasicExpoToken(req.Token); err != nil {
+		log.Printf("DEBUG: Token validation failed for user %d: %v", userID.(uint), err)
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid push token format",
-			"message": "Push token length is invalid", // This matches your frontend error
-		})
-		return
-	}
-
-	// FIXED: More reasonable length validation for Expo tokens
-	// Typical Expo tokens are around 185-220 characters
-	if len(req.Token) < 150 || len(req.Token) > 300 {
-		log.Printf("DEBUG: Invalid token length for user %d: %d characters (expected 150-300)", 
-			userID.(uint), len(req.Token))
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Push token length is invalid",
-			"expected_range": "150-300 characters",
-			"actual_length": len(req.Token),
-		})
-		return
-	}
-
-	// Additional validation: Check if token ends properly
-	if !strings.HasSuffix(req.Token, "]") {
-		log.Printf("DEBUG: Token doesn't end with ']' for user %d", userID.(uint))
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid push token format",
-			"message": "Push token length is invalid",
-		})
-		return
-	}
-
-	// Validate the inner token format
-	if err := validateExpoTokenFormat(req.Token); err != nil {
-		log.Printf("DEBUG: Token format validation failed for user %d: %v", userID.(uint), err)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid push token format",
-			"message": "Push token length is invalid",
-			"details": err.Error(),
+			"error":         "Invalid push token format",
+			"message":       err.Error(),
+			"token_length":  len(req.Token),
+			"token_preview": req.Token[:min(50, len(req.Token))],
 		})
 		return
 	}
@@ -170,23 +138,41 @@ func (ptc *PushTokenController) RegisterPushToken(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Push token registered successfully"})
 }
 
-// Helper function to validate Expo token format
-func validateExpoTokenFormat(token string) error {
-	// Extract the inner token
-	if !strings.HasPrefix(token, "ExponentPushToken[") || !strings.HasSuffix(token, "]") {
-		return fmt.Errorf("invalid token wrapper format")
+// Helper function to validate basic Expo token format
+func validateBasicExpoToken(token string) error {
+	// Check if token is empty
+	if token == "" {
+		return fmt.Errorf("push token is empty")
 	}
 
-	innerToken := token[18 : len(token)-1] // Remove "ExponentPushToken[" and "]"
-	
-	if len(innerToken) < 20 {
-		return fmt.Errorf("inner token too short: %d characters", len(innerToken))
+	// Check minimum length (Expo tokens are typically quite long)
+	if len(token) < 50 {
+		return fmt.Errorf("push token too short: %d characters (minimum 50)", len(token))
 	}
 
-	// Check for valid base64-like characters
-	validChars := regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
-	if !validChars.MatchString(innerToken) {
-		return fmt.Errorf("inner token contains invalid characters")
+	// Check maximum reasonable length
+	if len(token) > 500 {
+		return fmt.Errorf("push token too long: %d characters (maximum 500)", len(token))
+	}
+
+	// For Expo tokens, check basic format
+	if strings.HasPrefix(token, "ExponentPushToken[") {
+		if !strings.HasSuffix(token, "]") {
+			return fmt.Errorf("invalid Expo token format: missing closing bracket")
+		}
+
+		// Extract inner token and check it's not empty
+		innerToken := token[18 : len(token)-1]
+		if len(innerToken) < 10 {
+			return fmt.Errorf("invalid Expo token: inner token too short")
+		}
+
+		return nil
+	}
+
+	// For other token formats, just check it's not obviously invalid
+	if strings.Contains(token, " ") {
+		return fmt.Errorf("push token contains spaces")
 	}
 
 	return nil
@@ -271,4 +257,35 @@ func (ptc *PushTokenController) RemovePushToken(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Push token removed successfully"})
+}
+
+// TestTokenValidation is a temporary endpoint to test token validation without auth
+func (ptc *PushTokenController) TestTokenValidation(c *gin.Context) {
+	var req PushTokenRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": utils.FormatValidationError(err)})
+		return
+	}
+
+	log.Printf("DEBUG: Test token validation - Token length: %d, Platform: %s", len(req.Token), req.Platform)
+	log.Printf("DEBUG: Test token received: %s", req.Token)
+
+	// Test validation
+	if err := validateBasicExpoToken(req.Token); err != nil {
+		log.Printf("DEBUG: Test token validation failed: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":         "Invalid push token format",
+			"message":       err.Error(),
+			"token_length":  len(req.Token),
+			"token_preview": req.Token[:min(50, len(req.Token))],
+		})
+		return
+	}
+
+	log.Printf("DEBUG: Test token validation passed")
+	c.JSON(http.StatusOK, gin.H{
+		"message":      "Token validation passed",
+		"token_length": len(req.Token),
+		"token_valid":  true,
+	})
 }
