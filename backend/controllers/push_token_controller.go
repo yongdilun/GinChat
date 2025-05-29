@@ -145,16 +145,6 @@ func validateBasicExpoToken(token string) error {
 		return fmt.Errorf("push token is empty")
 	}
 
-	// Check minimum length (Expo tokens are typically quite long)
-	if len(token) < 50 {
-		return fmt.Errorf("push token too short: %d characters (minimum 50)", len(token))
-	}
-
-	// Check maximum reasonable length
-	if len(token) > 500 {
-		return fmt.Errorf("push token too long: %d characters (maximum 500)", len(token))
-	}
-
 	// For Expo tokens, check basic format
 	if strings.HasPrefix(token, "ExponentPushToken[") {
 		if !strings.HasSuffix(token, "]") {
@@ -163,8 +153,8 @@ func validateBasicExpoToken(token string) error {
 
 		// Extract inner token and check it's not empty
 		innerToken := token[18 : len(token)-1]
-		if len(innerToken) < 10 {
-			return fmt.Errorf("invalid Expo token: inner token too short")
+		if innerToken == "" {
+			return fmt.Errorf("invalid Expo token: inner token is empty")
 		}
 
 		return nil
