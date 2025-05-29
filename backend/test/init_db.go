@@ -148,17 +148,27 @@ func initMySQL() (*gorm.DB, error) {
 	// Clear all existing data by dropping and recreating tables
 	log.Println("Clearing all MySQL data...")
 
-	// Drop the users table if it exists
-	if db.Migrator().HasTable(&models.User{}) {
-		log.Println("Dropping existing users table")
-		err = db.Migrator().DropTable(&models.User{})
-		if err != nil {
-			return nil, fmt.Errorf("failed to drop users table: %v", err)
+	// Drop all existing tables
+	tables := []interface{}{
+		&models.User{},
+		&models.PushToken{},
+	}
+
+	for _, table := range tables {
+		if db.Migrator().HasTable(table) {
+			log.Printf("Dropping existing table: %T", table)
+			err = db.Migrator().DropTable(table)
+			if err != nil {
+				return nil, fmt.Errorf("failed to drop table %T: %v", table, err)
+			}
 		}
 	}
 
-	// Auto migrate the schema
-	err = db.AutoMigrate(&models.User{})
+	// Auto migrate the schema for all models
+	err = db.AutoMigrate(
+		&models.User{},
+		&models.PushToken{},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to migrate schema: %v", err)
 	}
@@ -245,16 +255,24 @@ func initMongoDB() (*mongo.Database, error) {
 	// Clear all existing data by dropping collections
 	log.Println("Clearing all MongoDB data...")
 
+	// Define all collections to be created
+	collections := []string{
+		"chatrooms",
+		"messages",
+		"chatroom_members",
+		"message_read_status",
+		"user_last_read",
+	}
+
 	// Get list of existing collections
-	collections, err := db.ListCollectionNames(ctx, bson.D{})
+	existingCollections, err := db.ListCollectionNames(ctx, bson.D{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list collections: %v", err)
 	}
 
 	// Drop existing collections
-	for _, collectionName := range collections {
-		if collectionName == "chatrooms" || collectionName == "messages" || collectionName == "chatroom_members" ||
-			collectionName == "message_read_status" || collectionName == "user_last_read" {
+	for _, collectionName := range existingCollections {
+		if contains(collections, collectionName) {
 			log.Printf("Dropping existing collection: %s", collectionName)
 			err = db.Collection(collectionName).Drop(ctx)
 			if err != nil {
@@ -265,39 +283,15 @@ func initMongoDB() (*mongo.Database, error) {
 
 	// Create fresh collections
 	log.Println("Creating fresh MongoDB collections...")
-
-	err = db.CreateCollection(ctx, "chatrooms")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create chatrooms collection: %v", err)
+	for _, collectionName := range collections {
+		err = db.CreateCollection(ctx, collectionName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create collection %s: %v", collectionName, err)
+		}
+		log.Printf("Created collection: %s", collectionName)
 	}
-	log.Println("Created chatrooms collection")
-
-	err = db.CreateCollection(ctx, "messages")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create messages collection: %v", err)
-	}
-	log.Println("Created messages collection")
-
-	err = db.CreateCollection(ctx, "chatroom_members")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create chatroom_members collection: %v", err)
-	}
-	log.Println("Created chatroom_members collection")
-
-	err = db.CreateCollection(ctx, "message_read_status")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create message_read_status collection: %v", err)
-	}
-	log.Println("Created message_read_status collection")
-
-	err = db.CreateCollection(ctx, "user_last_read")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create user_last_read collection: %v", err)
-	}
-	log.Println("Created user_last_read collection")
 
 	log.Println("MongoDB database initialization completed - ready for use")
-
 	return db, nil
 }
 
@@ -307,4 +301,14 @@ func getEnv(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+// Helper function to check if a string is in a slice
+func contains(slice []string, str string) bool {
+	for _, v := range slice {
+		if v == str {
+			return true
+		}
+	}
+	return false
 }

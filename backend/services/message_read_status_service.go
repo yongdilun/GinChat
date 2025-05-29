@@ -268,13 +268,18 @@ func (s *MessageReadStatusService) GetUnreadCountForUser(userID uint) ([]models.
 		"members.user_id": userID,
 	})
 	if err != nil {
-		return nil, errors.New("failed to get user chatrooms")
+		return []models.ChatroomUnreadCount{}, nil // Return empty array instead of error
 	}
 	defer chatroomCursor.Close(context.Background())
 
 	var userChatrooms []models.Chatroom
 	if err := chatroomCursor.All(context.Background(), &userChatrooms); err != nil {
-		return nil, errors.New("failed to decode user chatrooms")
+		return []models.ChatroomUnreadCount{}, nil // Return empty array instead of error
+	}
+
+	// If user has no chatrooms, return empty array
+	if len(userChatrooms) == 0 {
+		return []models.ChatroomUnreadCount{}, nil
 	}
 
 	// Create a map of chatroom IDs for quick lookup
@@ -304,7 +309,7 @@ func (s *MessageReadStatusService) GetUnreadCountForUser(userID uint) ([]models.
 
 	cursor, err := s.ReadStatusColl.Aggregate(context.Background(), pipeline)
 	if err != nil {
-		return nil, errors.New("failed to aggregate unread counts")
+		return []models.ChatroomUnreadCount{}, nil // Return empty array instead of error
 	}
 	defer cursor.Close(context.Background())
 
