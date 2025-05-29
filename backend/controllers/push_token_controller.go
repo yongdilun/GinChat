@@ -58,28 +58,60 @@ func (ptc *PushTokenController) RegisterPushToken(c *gin.Context) {
 		return
 	}
 
-	// Debug: Log the registration attempt
+	// Debug: Log the registration attempt with more details
 	log.Printf("DEBUG: Push token registration attempt - User ID: %v, Token length: %d, Platform: %s",
 		userID, len(req.Token), req.Platform)
+	log.Printf("DEBUG: Token preview: %s...", req.Token[:min(50, len(req.Token))])
 
-	// Validate token format (Expo tokens start with "ExponentPushToken[" or "ExpoPushToken[")
-	if !strings.HasPrefix(req.Token, "ExponentPushToken[") && !strings.HasPrefix(req.Token, "ExpoPushToken[") {
-		log.Printf("DEBUG: Invalid token format for user %d: %s", userID.(uint), req.Token[:50]+"...")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid push token format"})
+	// FIXED: Only check for the correct Expo token format
+	if !strings.HasPrefix(req.Token, "ExponentPushToken[") {
+		log.Printf("DEBUG: Invalid token format for user %d. Expected 'ExponentPushToken[' prefix, got: %s...", 
+			userID.(uint), req.Token[:min(50, len(req.Token))])
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid push token format",
+			"message": "Push token length is invalid", // This matches your frontend error
+		})
 		return
 	}
 
-	// Check token length (Expo tokens are typically 200-400 characters)
-	if len(req.Token) < 50 || len(req.Token) > 500 {
-		log.Printf("DEBUG: Invalid token length for user %d: %d characters", userID.(uint), len(req.Token))
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Push token length is invalid"})
+	// FIXED: More reasonable length validation for Expo tokens
+	// Typical Expo tokens are around 185-220 characters
+	if len(req.Token) < 150 || len(req.Token) > 300 {
+		log.Printf("DEBUG: Invalid token length for user %d: %d characters (expected 150-300)", 
+			userID.(uint), len(req.Token))
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Push token length is invalid",
+			"expected_range": "150-300 characters",
+			"actual_length": len(req.Token),
+		})
+		return
+	}
+
+	// Additional validation: Check if token ends properly
+	if !strings.HasSuffix(req.Token, "]") {
+		log.Printf("DEBUG: Token doesn't end with ']' for user %d", userID.(uint))
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid push token format",
+			"message": "Push token length is invalid",
+		})
+		return
+	}
+
+	// Validate the inner token format
+	if err := validateExpoTokenFormat(req.Token); err != nil {
+		log.Printf("DEBUG: Token format validation failed for user %d: %v", userID.(uint), err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid push token format",
+			"message": "Push token length is invalid",
+			"details": err.Error(),
+		})
 		return
 	}
 
 	// Convert device info to JSON
 	deviceInfoJSON, _ := json.Marshal(req.DeviceInfo)
 
-	// Check if this exact token already exists for this user (regardless of active status)
+	// Rest of your existing code remains the same...
 	var existingToken models.PushToken
 	result := ptc.DB.Where("user_id = ? AND token = ?", userID.(uint), req.Token).First(&existingToken)
 
@@ -134,6 +166,36 @@ func (ptc *PushTokenController) RegisterPushToken(c *gin.Context) {
 
 	log.Printf("DEBUG: Push token registered successfully for user %d", userID.(uint))
 	c.JSON(http.StatusCreated, gin.H{"message": "Push token registered successfully"})
+}
+
+// Helper function to validate Expo token format
+func validateExpoTokenFormat(token string) error {
+	// Extract the inner token
+	if !strings.HasPrefix(token, "ExponentPushToken[") || !strings.HasSuffix(token, "]") {
+		return fmt.Errorf("invalid token wrapper format")
+	}
+
+	innerToken := token[18 : len(token)-1] // Remove "ExponentPushToken[" and "]"
+	
+	if len(innerToken) < 20 {
+		return fmt.Errorf("inner token too short: %d characters", len(innerToken))
+	}
+
+	// Check for valid base64-like characters
+	validChars := regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+	if !validChars.MatchString(innerToken) {
+		return fmt.Errorf("inner token contains invalid characters")
+	}
+
+	return nil
+}
+
+// Helper function for min (Go doesn't have built-in min for int)
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // UpdatePushToken updates an existing push token
