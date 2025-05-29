@@ -118,7 +118,14 @@ func (uc *UserController) Login(c *gin.Context) {
 	if err != nil {
 		// Add a small delay to prevent timing attacks
 		time.Sleep(time.Duration(100+rand.Intn(100)) * time.Millisecond)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": utils.FormatServiceError(err)})
+
+		// Check for specific error types
+		if err.Error() == "this user is already logged in on another device" {
+			c.JSON(http.StatusConflict, gin.H{"error": utils.FormatServiceError(err)})
+		} else {
+			// Invalid credentials or other errors
+			c.JSON(http.StatusUnauthorized, gin.H{"error": utils.FormatServiceError(err)})
+		}
 		return
 	}
 
