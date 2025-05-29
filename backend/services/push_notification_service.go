@@ -86,29 +86,10 @@ func (s *PushNotificationService) SendMessageNotification(
 		return nil // No members to notify
 	}
 
-	// Debug: Log the user IDs we're looking for
-	log.Printf("DEBUG: Looking for push tokens for users: %v", userIDs)
-
 	// Get active push tokens for these users
 	var pushTokens []models.PushToken
 	if err := s.db.Where("user_id IN ? AND is_active = ?", userIDs, true).Find(&pushTokens).Error; err != nil {
 		return fmt.Errorf("failed to get push tokens: %w", err)
-	}
-
-	// Debug: Log what we found
-	log.Printf("DEBUG: Found %d active push tokens for users %v", len(pushTokens), userIDs)
-	for _, token := range pushTokens {
-		log.Printf("DEBUG: Token for user %d: %s (platform: %s)", token.UserID, token.Token[:20]+"...", token.Platform)
-	}
-
-	// Also check if there are ANY push tokens in the database
-	var allTokens []models.PushToken
-	if err := s.db.Find(&allTokens).Error; err == nil {
-		log.Printf("DEBUG: Total push tokens in database: %d", len(allTokens))
-		for _, token := range allTokens {
-			log.Printf("DEBUG: All tokens - User %d: %s (active: %v, platform: %s)",
-				token.UserID, token.Token[:20]+"...", token.IsActive, token.Platform)
-		}
 	}
 
 	if len(pushTokens) == 0 {

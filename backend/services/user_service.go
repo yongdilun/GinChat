@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"log"
 	"time"
 
 	"github.com/ginchat/models"
@@ -73,6 +74,12 @@ func (s *UserService) Login(email, password string) (*models.User, error) {
 		return nil, errors.New("invalid email or password")
 	}
 
+	// Check if user is already logged in on another device
+	if user.IsLogin {
+		log.Printf("DEBUG: User %d (%s) attempted login but already logged in", user.UserID, user.Email)
+		return nil, errors.New("this user is already logged in on another device")
+	}
+
 	// Update user status
 	user.IsLogin = true
 	user.Status = "online"
@@ -82,10 +89,11 @@ func (s *UserService) Login(email, password string) (*models.User, error) {
 	user.Heartbeat = customTimePtr
 	s.DB.Save(&user)
 
+	log.Printf("DEBUG: User %d (%s) logged in successfully", user.UserID, user.Email)
 	return &user, nil
 }
 
-// Logout updates the user's status
+// Logout updates the user's status and deactivates push tokens
 func (s *UserService) Logout(userID uint) error {
 	// Find user by ID
 	var user models.User
@@ -100,6 +108,14 @@ func (s *UserService) Logout(userID uint) error {
 		return errors.New("failed to update user status")
 	}
 
+	// Deactivate all push tokens for this user
+	if err := s.DB.Model(&models.PushToken{}).Where("user_id = ?", userID).Update("is_active", false).Error; err != nil {
+		// Log error but don't fail logout
+		log.Printf("Warning: Failed to deactivate push tokens for user %d: %v", userID, err)
+	} else {
+		log.Printf("DEBUG: Deactivated push tokens for user %d during logout", userID)
+	}
+
 	return nil
 }
 
@@ -107,6 +123,15 @@ func (s *UserService) Logout(userID uint) error {
 func (s *UserService) GetUserByID(userID uint) (*models.User, error) {
 	var user models.User
 	if result := s.DB.First(&user, userID); result.Error != nil {
+		return nil, errors.New("user not found")
+	}
+	return &user, nil
+}
+
+// GetUserByEmail retrieves a user by email
+func (s *UserService) GetUserByEmail(email string) (*models.User, error) {
+	var user models.User
+	if result := s.DB.Where("email = ?", email).First(&user); result.Error != nil {
 		return nil, errors.New("user not found")
 	}
 	return &user, nil

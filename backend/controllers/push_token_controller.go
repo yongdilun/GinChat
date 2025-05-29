@@ -63,12 +63,19 @@ func (ptc *PushTokenController) RegisterPushToken(c *gin.Context) {
 	// Convert device info to JSON
 	deviceInfoJSON, _ := json.Marshal(req.DeviceInfo)
 
-	// Check if token already exists for this user
+	// First, deactivate all existing tokens for this user (single device policy)
+	if err := ptc.DB.Model(&models.PushToken{}).Where("user_id = ?", userID.(uint)).Update("is_active", false).Error; err != nil {
+		log.Printf("DEBUG: Failed to deactivate existing tokens for user %d: %v", userID.(uint), err)
+	} else {
+		log.Printf("DEBUG: Deactivated all existing tokens for user %d", userID.(uint))
+	}
+
+	// Check if this exact token already exists for this user
 	var existingToken models.PushToken
 	result := ptc.DB.Where("user_id = ? AND token = ?", userID.(uint), req.Token).First(&existingToken)
 
 	if result.Error == nil {
-		// Token exists, update it
+		// Token exists, reactivate and update it
 		existingToken.Platform = req.Platform
 		existingToken.DeviceInfo = deviceInfoJSON
 		existingToken.IsActive = true
@@ -78,7 +85,8 @@ func (ptc *PushTokenController) RegisterPushToken(c *gin.Context) {
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{"message": "Push token updated successfully"})
+		log.Printf("DEBUG: Reactivated existing push token for user %d", userID.(uint))
+		c.JSON(http.StatusOK, gin.H{"message": "Push token reactivated successfully"})
 		return
 	}
 

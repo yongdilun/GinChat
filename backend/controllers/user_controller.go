@@ -178,6 +178,49 @@ func (uc *UserController) Logout(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
 
+// ForceLogout godoc
+// @Summary Force logout a user from another device
+// @Description Force logout a user by email (admin function or for handling multiple device login)
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body map[string]string true "Email of user to force logout"
+// @Success 200 {object} map[string]interface{} "User force logged out successfully"
+// @Failure 400 {object} map[string]interface{} "Invalid request"
+// @Failure 404 {object} map[string]interface{} "User not found"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /auth/force-logout [post]
+func (uc *UserController) ForceLogout(c *gin.Context) {
+	var req struct {
+		Email string `json:"email" binding:"required,email"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": utils.FormatValidationError(err)})
+		return
+	}
+
+	// Find and force logout user by email using UserService
+	user, err := uc.UserService.GetUserByEmail(req.Email)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Force logout the user
+	err = uc.UserService.Logout(user.UserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": utils.FormatServiceError(err)})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "User force logged out successfully",
+		"user_id": user.UserID,
+		"email":   user.Email,
+	})
+}
+
 // validatePasswordStrength checks if a password meets the minimum security requirements
 func validatePasswordStrength(password string) error {
 	if len(password) < 8 {
