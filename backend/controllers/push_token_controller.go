@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/ginchat/models"
@@ -55,6 +56,10 @@ func (ptc *PushTokenController) RegisterPushToken(c *gin.Context) {
 		return
 	}
 
+	// Debug: Log the registration attempt
+	log.Printf("DEBUG: Push token registration attempt - User ID: %v, Token: %s, Platform: %s",
+		userID, req.Token[:20]+"...", req.Platform)
+
 	// Convert device info to JSON
 	deviceInfoJSON, _ := json.Marshal(req.DeviceInfo)
 
@@ -87,10 +92,12 @@ func (ptc *PushTokenController) RegisterPushToken(c *gin.Context) {
 	}
 
 	if err := ptc.DB.Create(&pushToken).Error; err != nil {
+		log.Printf("DEBUG: Failed to create push token in database: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register push token"})
 		return
 	}
 
+	log.Printf("DEBUG: Push token registered successfully for user %d", userID.(uint))
 	c.JSON(http.StatusCreated, gin.H{"message": "Push token registered successfully"})
 }
 

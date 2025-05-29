@@ -26,6 +26,7 @@ backend/
 │   ├── chatroom_controller.go
 │   ├── message_controller.go
 │   ├── media_controller.go
+│   ├── push_token_controller.go  # Push token management
 │   └── websocket_controller.go
 ├── docs/               # Swagger documentation
 │   ├── docs.go
@@ -35,6 +36,7 @@ backend/
 │   └── auth.go         # Authentication middleware
 ├── models/             # Data models
 │   ├── user.go         # User model (MySQL)
+│   ├── push_token.go   # Push token model (MySQL)
 │   ├── chatroom.go     # Chatroom model (MongoDB)
 │   ├── chatroom_member.go # Chatroom member model (MongoDB)
 │   └── message.go      # Message model (MongoDB)
@@ -45,6 +47,7 @@ backend/
 │   ├── chatroom_service.go
 │   ├── message_service.go
 │   ├── media_service.go
+│   ├── push_notification_service.go  # Push notification service
 │   └── cloudinary_service.go  # Cloudinary integration for media storage
 ├── test/               # Test utilities
 │   ├── init_db.go      # Database initialization for testing
@@ -126,6 +129,13 @@ This backend serves multiple client applications:
   - MySQL for user data and authentication
   - MongoDB for chat data (messages, chatrooms, read status)
 - **Media Handling**: Support for uploading media files to Cloudinary cloud storage
+- **Push Notifications**: Real-time push notifications via Expo Push API
+  - **Cross-Platform Support**: Works with React Native Expo apps on iOS and Android
+  - **Smart Notification Management**: Notifications shown only when app is in background
+  - **Badge Count Management**: Automatic badge count updates based on unread messages
+  - **Notification Categories**: Support for quick actions like "Reply" and "Mark as Read"
+  - **Token Management**: Secure push token registration and management
+  - **Background Processing**: Asynchronous notification sending to prevent blocking
 - **API Documentation**: Swagger UI for interactive API documentation
 - **Structured Logging**: JSON-formatted logs with logrus
 - **Environment Configuration**: Flexible configuration via environment variables
@@ -195,6 +205,53 @@ All endpoints below require `Authorization: Bearer <token>` header.
 - **Description**: Logout the authenticated user
 - **Headers**: `Authorization: Bearer <token>`
 - **Response**: `200 OK`
+
+#### Register Push Token
+- **POST** `/api/auth/push-token`
+- **Description**: Register a push notification token for the authenticated user
+- **Headers**: `Authorization: Bearer <token>`
+- **Request Body**:
+  ```json
+  {
+    "token": "string (required) - Expo push token",
+    "platform": "string (required) - Platform: ios, android, web",
+    "device_info": {
+      "device_type": "string (optional) - Device type",
+      "app_version": "string (optional) - App version",
+      "os_version": "string (optional) - OS version",
+      "device_model": "string (optional) - Device model"
+    }
+  }
+  ```
+- **Response**: `201 Created` or `200 OK` (if token already exists)
+  ```json
+  {
+    "message": "Push token registered successfully"
+  }
+  ```
+
+#### Update Push Token
+- **PUT** `/api/auth/push-token`
+- **Description**: Update an existing push notification token
+- **Headers**: `Authorization: Bearer <token>`
+- **Request Body**: Same as register push token
+- **Response**: `200 OK`
+  ```json
+  {
+    "message": "Push token updated successfully"
+  }
+  ```
+
+#### Remove Push Token
+- **DELETE** `/api/auth/push-token`
+- **Description**: Deactivate all push notification tokens for the authenticated user
+- **Headers**: `Authorization: Bearer <token>`
+- **Response**: `200 OK`
+  ```json
+  {
+    "message": "Push token removed successfully"
+  }
+  ```
 
 ### Chatrooms (Auth Required)
 
@@ -1107,6 +1164,9 @@ curl -X POST http://localhost:8080/api/media/upload \
 | POST | `/api/auth/register` | Register new user | ❌ |
 | POST | `/api/auth/login` | Login user | ❌ |
 | POST | `/api/auth/logout` | Logout user | ✅ |
+| POST | `/api/auth/push-token` | Register push token | ✅ |
+| PUT | `/api/auth/push-token` | Update push token | ✅ |
+| DELETE | `/api/auth/push-token` | Remove push token | ✅ |
 | **Chatrooms** |
 | GET | `/api/chatrooms` | Get all chatrooms | ✅ |
 | GET | `/api/chatrooms/user` | Get user's joined chatrooms | ✅ |
@@ -1166,10 +1226,132 @@ curl -X POST http://localhost:8080/api/media/upload \
 
 ### MySQL (User Data)
 - **users**: User accounts and authentication data
+- **push_tokens**: Push notification tokens for mobile devices
+  - `id`: Primary key
+  - `user_id`: Foreign key to users table
+  - `token`: Expo push token (unique)
+  - `platform`: Device platform (ios, android, web)
+  - `device_info`: JSON field with device information
+  - `is_active`: Boolean flag for active tokens
+  - `created_at`, `updated_at`: Timestamps
 
 ### MongoDB (Chat Data)
 - **chatrooms**: Chat room information and members
 - **messages**: Chat messages with metadata
+
+## Push Notification System
+
+### Overview
+
+The GinChat backend includes a comprehensive push notification system that integrates with Expo's Push API to deliver real-time notifications to mobile devices. The system is designed to work seamlessly with React Native Expo applications.
+
+### Key Features
+
+- **Cross-Platform Support**: Works with iOS and Android devices via Expo Push API
+- **Smart Notification Management**: Notifications are only sent when the app is in background/killed
+- **Automatic Message Notifications**: Push notifications are automatically sent when new messages are received
+- **Token Management**: Secure registration and management of push tokens per user
+- **Background Processing**: Notifications are sent asynchronously to prevent blocking message sending
+- **Device Information Tracking**: Stores device metadata for better notification management
+
+### Architecture
+
+#### Components
+
+1. **PushToken Model** (`models/push_token.go`)
+   - Stores push tokens in MySQL database
+   - Links tokens to user accounts
+   - Tracks device information and platform
+   - Manages token activation status
+
+2. **PushNotificationService** (`services/push_notification_service.go`)
+   - Handles communication with Expo Push API
+   - Manages notification sending logic
+   - Retrieves chatroom members from MongoDB
+   - Formats notification content
+
+3. **PushTokenController** (`controllers/push_token_controller.go`)
+   - Provides REST API endpoints for token management
+   - Handles token registration, updates, and removal
+   - Validates token format and device information
+
+#### Integration Points
+
+- **Message Controller**: Automatically triggers push notifications when messages are sent
+- **WebSocket System**: Coordinates with real-time messaging to avoid duplicate notifications
+- **Authentication System**: All push token operations require valid JWT authentication
+
+### API Endpoints
+
+#### Push Token Management
+
+- `POST /api/auth/push-token` - Register a new push token
+- `PUT /api/auth/push-token` - Update an existing push token
+- `DELETE /api/auth/push-token` - Deactivate push tokens for user
+
+### Notification Flow
+
+1. **Token Registration**: Mobile app registers push token with backend
+2. **Message Sent**: User sends message in chatroom
+3. **Member Lookup**: System finds all chatroom members except sender
+4. **Token Retrieval**: Active push tokens retrieved for recipient users
+5. **Notification Formatting**: Message content formatted for notification
+6. **Expo API Call**: Notification sent via Expo Push API
+7. **Error Handling**: Failed notifications logged for debugging
+
+### Notification Content
+
+Notifications include:
+- **Title**: "New message in [Chatroom Name]"
+- **Body**: "[Sender Name]: [Message Content]" (truncated if too long)
+- **Data**: Chatroom ID, sender ID, message type for deep linking
+- **Sound**: Default notification sound
+- **Priority**: High priority for immediate delivery
+
+### Media Message Handling
+
+For media messages without text content:
+- **Picture**: "📷 Photo"
+- **Audio**: "🎵 Audio"
+- **Video**: "🎥 Video"
+- **Other**: "📎 Media"
+
+### Error Handling
+
+The system includes comprehensive error handling:
+- **Database Errors**: Graceful handling of connection issues
+- **Expo API Errors**: Logging of failed notification attempts
+- **Invalid Tokens**: Automatic cleanup of invalid/expired tokens
+- **Network Issues**: Retry logic for temporary failures
+
+### Security Considerations
+
+- **Authentication Required**: All push token operations require valid JWT
+- **User Isolation**: Users can only manage their own push tokens
+- **Token Validation**: Push tokens are validated before storage
+- **Secure Storage**: Tokens stored securely in MySQL database
+
+### Performance Optimizations
+
+- **Asynchronous Processing**: Notifications sent in background goroutines
+- **Batch Operations**: Multiple tokens processed efficiently
+- **Database Indexing**: Optimized queries for token retrieval
+- **Connection Pooling**: Efficient database connection management
+
+### Configuration
+
+No additional configuration required beyond standard database setup. The system uses:
+- **Expo Push API**: `https://exp.host/--/api/v2/push/send`
+- **MySQL Database**: For push token storage
+- **MongoDB Database**: For chatroom member lookup
+
+### Monitoring and Debugging
+
+The system provides detailed logging for:
+- Token registration/updates
+- Notification sending attempts
+- Expo API responses
+- Error conditions and failures
 
 ## Message Types
 
@@ -1458,7 +1640,19 @@ go build -o ginchat-server
 
 ## Recent Updates & Improvements
 
-### Optimized WebSocket Performance & Navigation Support (Latest)
+### Push Notification System Implementation (Latest)
+- **Expo Push API Integration**: Complete push notification system using Expo's Push API
+- **Cross-Platform Support**: Works seamlessly with React Native Expo apps on iOS and Android
+- **Smart Notification Management**: Notifications only sent when app is in background/killed state
+- **Automatic Message Notifications**: Push notifications automatically triggered when new messages are sent
+- **Token Management System**: Secure registration, update, and removal of push tokens
+- **Background Processing**: Asynchronous notification sending to prevent blocking message operations
+- **Device Information Tracking**: Stores device metadata for better notification management
+- **MongoDB Integration**: Retrieves chatroom members from MongoDB for targeted notifications
+- **Comprehensive Error Handling**: Graceful handling of Expo API errors and network issues
+- **Security Features**: JWT authentication required for all push token operations
+
+### Optimized WebSocket Performance & Navigation Support (Previous)
 - **Simplified Broadcasting**: Streamlined WebSocket broadcasting to reduce server load and connection issues
 - **Async Operations**: Made unread count updates asynchronous to prevent blocking
 - **Efficient Read Status Updates**: Optimized `message_read` event broadcasting for better performance
