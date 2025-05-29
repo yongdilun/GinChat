@@ -11,7 +11,7 @@ import (
 type PushToken struct {
 	ID         uint            `json:"id" gorm:"primaryKey"`
 	UserID     uint            `json:"user_id" gorm:"not null;index;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	Token      string          `json:"token" gorm:"not null;unique;size:255"`
+	Token      string          `json:"token" gorm:"not null;unique;size:500"`
 	Platform   string          `json:"platform" gorm:"not null;size:20"`
 	DeviceInfo json.RawMessage `json:"device_info" gorm:"type:json"`
 	IsActive   bool            `json:"is_active" gorm:"default:true;index"`
