@@ -12,7 +12,7 @@ import (
 type PushToken struct {
 	ID         uint            `json:"id" gorm:"primaryKey"`
 	UserID     uint            `json:"user_id" gorm:"not null;index;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	Token      string          `json:"token" gorm:"not null;unique;size:1000"`
+	Token      string          `json:"token" gorm:"not null;size:255;index:idx_token_hash,type:hash"`
 	Platform   string          `json:"platform" gorm:"not null;size:20"`
 	DeviceInfo json.RawMessage `json:"device_info" gorm:"type:json"`
 	IsActive   bool            `json:"is_active" gorm:"default:true;index"`
@@ -53,8 +53,8 @@ func (PushToken) TableName() string {
 
 // ValidateToken validates the push token format
 func (pt *PushToken) ValidateToken() error {
-	if len(pt.Token) < 50 || len(pt.Token) > 1000 {
-		return fmt.Errorf("token length must be between 50 and 1000 characters")
+	if len(pt.Token) < 50 || len(pt.Token) > 255 {
+		return fmt.Errorf("token length must be between 50 and 255 characters")
 	}
 	return nil
 }
