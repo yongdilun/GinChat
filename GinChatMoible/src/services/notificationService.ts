@@ -6,6 +6,21 @@ import { Logger } from '../utils/logger';
 import Constants from 'expo-constants';
 import { firebaseApp } from '../config/firebase';
 
+// Define new interfaces for stored notifications
+interface StoredNotification {
+  messageId: string; // Assuming messageId is available in notification data
+  senderName: string;
+  messageContent: string;
+  timestamp: number;
+}
+
+interface ChatroomNotificationGroup {
+  chatroomId: string;
+  chatroomName: string; // Add this
+  messages: StoredNotification[];
+  lastNotificationTimestamp: number;
+}
+
 // Expo push notification configuration
 const expoPushConfig = {
   projectId: 'ed9112c0-dcb5-44d5-abf9-2f85fc7baf6c',
@@ -468,9 +483,174 @@ class NotificationService {
     });
 
     // Process notification data
-    const data = notification.request.content.data as NotificationData;
-    if (data) {
+    const data = notification.request.content.data as NotificationData & {
+      // Explicitly type expected properties from the push notification
+      senderName?: string;
+      messageContent?: string;
+      chatroomName?: string; // Added chatroomName
+    };
+
+    if (data && data.type === 'new_message' && data.chatroomId && data.messageId && data.senderName && data.messageContent && data.chatroomName) {
+      this.storeNotificationAndUpdateGroup(data as Required<NotificationData & { senderName: string; messageContent: string; chatroomName: string; }>);
+      this.handleNotificationData(data); // Keep existing logic if needed
+    } else if (data) {
+      // Fallback for other notification types or if data is incomplete
       this.handleNotificationData(data);
+    }
+  }
+
+  // New method to store notification and update group
+  // Helper function to get a specific chatroom notification group
+  async getChatroomNotificationGroup(chatroomId: string): Promise<ChatroomNotificationGroup | null> {
+    try {
+      const storedGroups = await AsyncStorage.getItem('notificationGroups');
+      if (storedGroups) {
+        const groups: Record<string, ChatroomNotificationGroup> = JSON.parse(storedGroups);
+        return groups[chatroomId] || null;
+      }
+      return null;
+    } catch (error) {
+      Logger.error('Error getting chatroom notification group from AsyncStorage:', error);
+      return null;
+    }
+  }
+
+  // New method to clear a specific chatroom's notification group from AsyncStorage
+  async clearStoredNotificationGroup(chatroomId: string): Promise<void> {
+    try {
+      const storedGroups = await AsyncStorage.getItem('notificationGroups');
+      if (storedGroups) {
+        const groups: Record<string, ChatroomNotificationGroup> = JSON.parse(storedGroups);
+        if (groups[chatroomId]) {
+          delete groups[chatroomId];
+          await AsyncStorage.setItem('notificationGroups', JSON.stringify(groups));
+          Logger.info(`Cleared stored notification group for chatroom: ${chatroomId}`);
+        }
+      }
+    } catch (error) {
+      Logger.error('Error clearing stored notification group:', error);
+    }
+  }
+
+  private async storeNotificationAndUpdateGroup(
+    notificationData: Required<NotificationData & { senderName: string; messageContent: string; chatroomName: string; messageId: string; }>
+  ): Promise<void> {
+    try {
+      const { chatroomId, chatroomName, messageId, senderName, messageContent } = notificationData;
+      // Ensure timestamp is a number. If it's a string, parse it. If undefined, use Date.now().
+      let timestamp: number;
+      if (typeof notificationData.timestamp === 'string') {
+        timestamp = parseInt(notificationData.timestamp, 10);
+      } else if (typeof notificationData.timestamp === 'number') {
+        timestamp = notificationData.timestamp;
+      } else {
+        timestamp = Date.now();
+      }
+
+      const storedMessage: StoredNotification = {
+        messageId,
+        senderName,
+        messageContent,
+        timestamp,
+      };
+
+      const storedGroups = await AsyncStorage.getItem('notificationGroups');
+      let groups: Record<string, ChatroomNotificationGroup> = storedGroups ? JSON.parse(storedGroups) : {};
+
+      if (!groups[chatroomId]) {
+        groups[chatroomId] = {
+          chatroomId,
+          chatroomName, // Initialize with chatroomName
+          messages: [],
+          lastNotificationTimestamp: 0,
+        };
+      }
+
+      groups[chatroomId].messages.push(storedMessage);
+      // Sort messages by timestamp, newest first for easier display
+      groups[chatroomId].messages.sort((a, b) => b.timestamp - a.timestamp);
+      // Optional: Limit the number of stored messages per group
+      // if (groups[chatroomId].messages.length > 50) {
+      //   groups[chatroomId].messages = groups[chatroomId].messages.slice(0, 50);
+      // }
+      groups[chatroomId].lastNotificationTimestamp = Date.now();
+      // Update chatroomName in case it changed (though unlikely for a specific ID)
+      groups[chatroomId].chatroomName = chatroomName;
+
+
+      await AsyncStorage.setItem('notificationGroups', JSON.stringify(groups));
+      Logger.info('Notification groups updated and stored:', groups);
+      // For verification during development:
+      console.log('Updated notification groups:', JSON.stringify(groups, null, 2));
+
+      // After storing and updating, decide how to display
+      const updatedGroup = groups[chatroomId];
+      if (!updatedGroup) return;
+
+      if (this.notificationState.isInForeground) {
+        // App is in foreground: Display custom in-app notification
+        let title = chatroomName;
+        let body = '';
+        if (updatedGroup.messages.length === 1) {
+          const lastMessage = updatedGroup.messages[0];
+          title = chatroomName; // Or senderName if preferred for 1-1 like feel
+          body = `${lastMessage.senderName}: ${lastMessage.messageContent}`;
+        } else {
+          body = `${updatedGroup.messages.length} new messages in ${updatedGroup.chatroomName}`;
+        }
+
+        // TODO: Check if user is currently in this specific chatroom. For now, always show.
+        // Use chatroomId and a unique part for identifier to try and make it replaceable
+        const foregroundNotificationId = `foreground_${chatroomId}_${Date.now()}`;
+
+        Notifications.scheduleNotificationAsync({
+          content: {
+            title: title,
+            body: body,
+            sound: 'default', // Consider making this conditional
+            data: { ...notificationData, notificationId: foregroundNotificationId }, // Pass original data
+          },
+          identifier: foregroundNotificationId, // Use this to potentially update/dismiss
+          trigger: null, // immediate
+        });
+        Logger.info(`Scheduled foreground notification for ${chatroomId}: ${foregroundNotificationId}`);
+
+      } else {
+        // App is in background: Display summarized push notification
+        let title = `New messages in ${updatedGroup.chatroomName}`;
+        let body = '';
+
+        if (updatedGroup.messages.length === 1) {
+          const firstMessage = updatedGroup.messages[0];
+          body = `${firstMessage.senderName}: ${firstMessage.messageContent}`;
+        } else if (updatedGroup.messages.length > 1) {
+          const firstMessage = updatedGroup.messages[0]; // Most recent
+          body = `${firstMessage.senderName} and ${updatedGroup.messages.length - 1} others sent messages in ${updatedGroup.chatroomName}`;
+        }
+
+        // Use chatroomId as the identifier for the notification request.
+        // This should make new notifications for the same chatroom replace the old ones.
+        const backgroundNotificationIdentifier = chatroomId;
+
+        Notifications.scheduleNotificationAsync({
+          content: {
+            title: title,
+            body: body,
+            sound: 'default',
+            badge: (this.notificationState.totalUnreadCount || 0) + 1, // Tentative: update badge based on group
+            data: { ...notificationData, chatroomId, notificationId: backgroundNotificationIdentifier }, // Ensure chatroomId is in data for navigation
+          },
+          identifier: backgroundNotificationIdentifier, // Key for summarization
+          trigger: {
+            seconds: 1, // Schedule slightly in the future to allow dismissal to work if needed
+            channelId: 'chat-messages', // Ensure it uses our configured channel on Android
+          },
+        });
+        Logger.info(`Scheduled background/summarized notification for ${chatroomId} with identifier: ${backgroundNotificationIdentifier}`);
+      }
+
+    } catch (error) {
+      Logger.error('Error storing notification, updating group, or displaying notification:', error);
     }
   }
 
@@ -580,12 +760,17 @@ class NotificationService {
   // Handle app coming to foreground
   private async handleAppForeground(): Promise<void> {
     try {
-      // Clear all notifications when app becomes active
+      // Clear all OS notifications when app becomes active
       await this.clearAllNotifications();
+      Logger.debug('Cleared all OS notifications on app foreground.');
+
+      // Clear stored notification groups from AsyncStorage
+      await AsyncStorage.removeItem('notificationGroups');
+      Logger.info('Cleared all stored notification groups from AsyncStorage on app foreground.');
 
       // Update badge count based on actual unread messages
       // This should be called from the chat service when unread counts are updated
-      Logger.debug('App came to foreground, cleared notifications');
+      Logger.debug('App came to foreground.');
     } catch (error) {
       Logger.error('Error handling app foreground:', error);
     }
@@ -649,12 +834,17 @@ class NotificationService {
   async updateChatroomUnreadCount(chatroomId: string, count: number): Promise<void> {
     this.notificationState.chatroomUnreadCounts[chatroomId] = count;
     this.notificationState.totalUnreadCount = Object.values(this.notificationState.chatroomUnreadCounts)
-      .reduce((total, count) => total + count, 0);
+      .reduce((total, current) => total + current, 0);
 
     await this.setBadgeCount(this.notificationState.totalUnreadCount);
     await this.saveNotificationState();
 
     Logger.debug(`Updated unread count for chatroom ${chatroomId}: ${count}, total: ${this.notificationState.totalUnreadCount}`);
+
+    if (count === 0) {
+      // If unread count for a chatroom is zero, clear its stored notification group
+      await this.clearStoredNotificationGroup(chatroomId);
+    }
   }
 
   // Get current notification state

@@ -185,6 +185,15 @@ func (mc *MessageController) SendMessage(c *gin.Context) {
 			fmt.Printf("DEBUG: Sending push notification for chatroom %s, sender %d, content: %s\n",
 				chatroomID.Hex(), userID.(uint), messageContent)
 
+			// Get active users in the chatroom for filtering
+			var activeUserIDsInChatroom []uint
+			if GlobalWebSocketController != nil {
+				activeUserIDsInChatroom = GlobalWebSocketController.GetConnectedUsersInRoom(chatroomID.Hex())
+				fmt.Printf("DEBUG: Active users in chatroom %s: %v\n", chatroomID.Hex(), activeUserIDsInChatroom)
+			} else {
+				fmt.Println("DEBUG: GlobalWebSocketController is nil, cannot get active users for push notification filtering.")
+			}
+
 			// Send notification
 			err = mc.PushNotificationService.SendMessageNotification(
 				chatroomID.Hex(),
@@ -192,6 +201,7 @@ func (mc *MessageController) SendMessage(c *gin.Context) {
 				username.(string),
 				messageContent,
 				chatroom.Name,
+				activeUserIDsInChatroom, // Pass the new list here
 			)
 			if err != nil {
 				fmt.Printf("Failed to send push notification: %v\n", err)

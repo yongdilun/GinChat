@@ -16,10 +16,14 @@ import (
 	"gorm.io/gorm"
 )
 
+// ExpoSender defines the function signature for sending Expo notifications.
+type ExpoSender func(tokens []string, title string, body string, data map[string]interface{}) error
+
 // PushNotificationService handles push notification operations
 type PushNotificationService struct {
-	db      *gorm.DB
-	mongodb *mongo.Database
+	db                     *gorm.DB
+	mongodb                *mongo.Database
+	sendExpoNotificationFunc ExpoSender // Field to hold the sender function
 }
 
 // ExpoMessage represents the structure for Expo push notifications
@@ -47,10 +51,12 @@ type ExpoResponse struct {
 
 // NewPushNotificationService creates a new PushNotificationService
 func NewPushNotificationService(db *gorm.DB, mongodb *mongo.Database) *PushNotificationService {
-	return &PushNotificationService{
+	s := &PushNotificationService{
 		db:      db,
 		mongodb: mongodb,
 	}
+	s.sendExpoNotificationFunc = s.defaultSendExpoNotification // Assign the real function
+	return s
 }
 
 // SendMessageNotification sends a push notification for a new message
@@ -60,6 +66,7 @@ func (s *PushNotificationService) SendMessageNotification(
 	senderName string,
 	messageContent string,
 	chatroomName string,
+	activeUserIDsInChatroom []uint, // New parameter
 ) error {
 	// Convert chatroomID string to ObjectID
 	objID, err := primitive.ObjectIDFromHex(chatroomID)
@@ -74,21 +81,32 @@ func (s *PushNotificationService) SendMessageNotification(
 		return fmt.Errorf("failed to get chatroom: %w", err)
 	}
 
-	// Get all members except the sender
-	var userIDs []uint
+	// Get all members except the sender AND active users
+	var targetUserIDs []uint
 	for _, member := range chatroom.Members {
-		if member.UserID != senderID {
-			userIDs = append(userIDs, member.UserID)
+		if member.UserID == senderID {
+			continue // Skip sender
+		}
+		isActiveInChatroom := false
+		for _, activeUID := range activeUserIDsInChatroom {
+			if member.UserID == activeUID {
+				isActiveInChatroom = true
+				break
+			}
+		}
+		if !isActiveInChatroom {
+			targetUserIDs = append(targetUserIDs, member.UserID)
 		}
 	}
 
-	if len(userIDs) == 0 {
-		return nil // No members to notify
+	if len(targetUserIDs) == 0 {
+		log.Printf("No members to notify for chatroom %s (all active or only sender)", chatroomID)
+		return nil
 	}
 
-	// Get active push tokens for these users
+	// Get active push tokens for these targetUserIDs
 	var pushTokens []models.PushToken
-	if err := s.db.Where("user_id IN ? AND is_active = ?", userIDs, true).Find(&pushTokens).Error; err != nil {
+	if err := s.db.Where("user_id IN ? AND is_active = ?", targetUserIDs, true).Find(&pushTokens).Error; err != nil {
 		return fmt.Errorf("failed to get push tokens: %w", err)
 	}
 
@@ -114,15 +132,17 @@ func (s *PushNotificationService) SendMessageNotification(
 
 	// Send notification
 	log.Printf("Sending push notification to %d tokens for chatroom %s", len(tokens), chatroomID)
-	return s.sendExpoNotification(tokens, title, body, map[string]interface{}{
-		"chatroomId": chatroomID,
-		"senderId":   senderID,
-		"type":       "new_message",
+	return s.sendExpoNotificationFunc(tokens, title, body, map[string]interface{}{
+		"chatroomId":   chatroomID,
+		"senderId":     senderID,
+		"type":         "new_message",
+		"senderName":   senderName,
+		"chatroomName": chatroomName,
 	})
 }
 
-// sendExpoNotification sends notification via Expo Push API
-func (s *PushNotificationService) sendExpoNotification(
+// defaultSendExpoNotification is the actual implementation for sending notifications.
+func (s *PushNotificationService) defaultSendExpoNotification(
 	tokens []string,
 	title string,
 	body string,
