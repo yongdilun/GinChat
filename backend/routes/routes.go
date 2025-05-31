@@ -41,7 +41,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB, mongodb *mongo.Database, logger *lo
 	})
 
 	// Root endpoint for uptime checks
-	r.GET("/", func(c *gin.Context) {
+	r.HEAD("/", func(c *gin.Context) {
 		c.String(http.StatusOK, "OK")
 	})
 
