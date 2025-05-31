@@ -45,6 +45,7 @@ func (s *SafeWebSocketConn) ReadMessage() (messageType int, p []byte, err error)
 }
 
 // WebSocketController handles WebSocket connections
+// Add user activity tracking for better push notification management
 type WebSocketController struct {
 	clients               map[uint]map[*SafeWebSocketConn]bool
 	rooms                 map[string]map[*SafeWebSocketConn]bool
@@ -53,12 +54,15 @@ type WebSocketController struct {
 	logger                *logrus.Logger
 	connectionAttempts    map[uint]time.Time
 	connectionAttemptsMux sync.RWMutex
+	// Add these fields for activity tracking
+	userActivity          map[uint]time.Time // Track last activity per user
+	userActivityMux       sync.RWMutex
 }
 
 // Global WebSocket controller instance for broadcasting messages
 var GlobalWebSocketController *WebSocketController
 
-// NewWebSocketController creates a new WebSocketController
+// Update the constructor to initialize new fields
 func NewWebSocketController(logger *logrus.Logger) *WebSocketController {
 	controller := &WebSocketController{
 		clients:            make(map[uint]map[*SafeWebSocketConn]bool),
@@ -66,6 +70,7 @@ func NewWebSocketController(logger *logrus.Logger) *WebSocketController {
 		broadcast:          make(chan []byte),
 		logger:             logger,
 		connectionAttempts: make(map[uint]time.Time),
+		userActivity:       make(map[uint]time.Time), // Initialize activity tracking
 	}
 
 	// Start broadcast handler
@@ -78,6 +83,24 @@ func NewWebSocketController(logger *logrus.Logger) *WebSocketController {
 	GlobalWebSocketController = controller
 
 	return controller
+}
+
+// Add method to update user activity when they connect or send messages
+func (wsc *WebSocketController) UpdateUserActivity(userID uint) {
+	wsc.userActivityMux.Lock()
+	defer wsc.userActivityMux.Unlock()
+	wsc.userActivity[userID] = time.Now()
+}
+
+// Add method to check if user is recently active (for push notification optimization)
+func (wsc *WebSocketController) IsUserRecentlyActive(userID uint, threshold time.Duration) bool {
+	wsc.userActivityMux.RLock()
+	defer wsc.userActivityMux.RUnlock()
+	
+	if lastActivity, exists := wsc.userActivity[userID]; exists {
+		return time.Since(lastActivity) < threshold
+	}
+	return false
 }
 
 // WebSocketMessage represents a message sent over WebSocket
@@ -158,7 +181,8 @@ func (wsc *WebSocketController) HandleConnection(c *gin.Context) {
 	}
 	wsc.rooms[roomID][conn] = true
 	wsc.clientsMux.Unlock()
-
+	
+	wsc.UpdateUserActivity(uid)
 	wsc.logger.Infof("User %d (chat room connection) connected to room %s via token-based WebSocket", uid, roomID)
 
 	// Send connection success message
@@ -230,6 +254,8 @@ func (wsc *WebSocketController) HandleConnection(c *gin.Context) {
 			heartbeatJSON, _ := json.Marshal(heartbeatMsg)
 			conn.WriteMessage(websocket.TextMessage, heartbeatJSON)
 		case "chat_message":
+			// Update user activity when they send messages
+			wsc.UpdateUserActivity(uid)
 			// Broadcast message only to the specified room
 			if msg.ChatroomID != "" {
 				wsc.clientsMux.RLock()
@@ -261,13 +287,15 @@ func (wsc *WebSocketController) canConnect(uid uint) bool {
 	return false
 }
 
-// cleanupConnectionAttempts periodically removes old connection attempts
+// Update cleanup to also clean user activity
 func (wsc *WebSocketController) cleanupConnectionAttempts() {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 
 	for range ticker.C {
 		now := time.Now()
+		
+		// Clean connection attempts
 		wsc.connectionAttemptsMux.Lock()
 		for uid, timestamp := range wsc.connectionAttempts {
 			if now.Sub(timestamp) > 5*time.Minute {
@@ -276,10 +304,16 @@ func (wsc *WebSocketController) cleanupConnectionAttempts() {
 		}
 		wsc.connectionAttemptsMux.Unlock()
 
-		// Cleanup completed (removed processed messages tracking for simplicity)
+		// Clean user activity older than 1 hour
+		wsc.userActivityMux.Lock()
+		for uid, timestamp := range wsc.userActivity {
+			if now.Sub(timestamp) > 1*time.Hour {
+				delete(wsc.userActivity, uid)
+			}
+		}
+		wsc.userActivityMux.Unlock()
 	}
 }
-
 // pingClient sends periodic pings to keep the connection alive
 func (wsc *WebSocketController) pingClient(conn *SafeWebSocketConn, _ uint) {
 	ticker := time.NewTicker(90 * time.Second) // Increased to 90 seconds to avoid conflicts
