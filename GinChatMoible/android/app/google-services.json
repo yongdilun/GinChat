@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "934599534009",
+    "project_id": "ginchat-33502",
+    "storage_bucket": "ginchat-33502.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:934599534009:android:52f6442f1cad7e36820268",
+        "android_client_info": {
+          "package_name": "com.yongdidi.GinChatMobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAqr6WDcYCxbbn57UBnbHgCg59DHIGXc2A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

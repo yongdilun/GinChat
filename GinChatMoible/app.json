@@ -1,0 +1,74 @@
+{
+  "expo": {
+    "name": "GinChatMobile",
+    "slug": "GinChatMobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "scheme": "ginchatmobile",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.yongdidi.GinChatMobile",
+      "googleServicesFile": "./google-services.json"
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-dev-client",
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "color": "#FFD700",
+          "defaultChannel": "chat-messages",
+          "icon": "./assets/notification-icon.png"
+        }
+      ],
+      [
+        "@react-native-firebase/app",
+        {
+          "android": {
+            "googleServicesFile": "./google-services.json"
+          }
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "buildToolsVersion": "35.0.0"
+          }
+        }
+      ]
+    ],
+    "notification": {
+      "color": "#FFD700",
+      "iosDisplayInForeground": false,
+      "androidMode": "default",
+      "androidCollapsedTitle": "New messages"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "ed9112c0-dcb5-44d5-abf9-2f85fc7baf6c"
+      }
+    },
+    "owner": "yongdidi"
+  }
+}
